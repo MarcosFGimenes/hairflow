@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -114,7 +115,7 @@ export default function NewProfessionalPage() {
             </div> */}
             
             <div className="flex justify-end gap-3 pt-6 border-t">
-              <Link href="/admin/professionals" passHref legacyBehavior>
+              <Link href="/admin/professionals">
                 <Button variant="outline" type="button">Cancel</Button>
               </Link>
               <Button type="submit" className="bg-primary hover:bg-primary/90">

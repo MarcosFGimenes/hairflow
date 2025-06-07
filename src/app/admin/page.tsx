@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -19,7 +20,7 @@ export default function AdminDashboardPage() {
         title="Admin Dashboard" 
         description="Overview of your salon's activity."
         actions={
-          <Link href="/admin/appointments/new" passHref legacyBehavior>
+          <Link href="/admin/appointments/new">
             <Button><PlusCircle className="mr-2 h-4 w-4" /> New Appointment</Button>
           </Link>
         }
@@ -77,13 +78,13 @@ export default function AdminDashboardPage() {
             <CardTitle className="font-headline">Quick Actions</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <Link href="/admin/slots" passHref legacyBehavior>
+            <Link href="/admin/slots">
               <Button variant="outline" className="w-full justify-start"><Clock className="mr-2 h-4 w-4" /> Manage Availability</Button>
             </Link>
-            <Link href="/admin/professionals" passHref legacyBehavior>
+            <Link href="/admin/professionals">
               <Button variant="outline" className="w-full justify-start"><Users className="mr-2 h-4 w-4" /> Add/Edit Professionals</Button>
             </Link>
-            <Link href="/admin/settings" passHref legacyBehavior>
+            <Link href="/admin/settings">
               <Button variant="outline" className="w-full justify-start"><Users className="mr-2 h-4 w-4" /> Update Salon Details</Button>
             </Link>
           </CardContent>

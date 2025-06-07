@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -20,7 +21,7 @@ export default function ProfessionalsPage() {
         title="Manage Professionals"
         description="Add, edit, or remove staff members for your salon."
         actions={
-          <Link href="/admin/professionals/new" passHref legacyBehavior>
+          <Link href="/admin/professionals/new">
             <Button><UserPlus className="mr-2 h-4 w-4" /> Add New Professional</Button>
           </Link>
         }
@@ -31,7 +32,7 @@ export default function ProfessionalsPage() {
             <UserPlus className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold font-headline text-foreground">No Professionals Added Yet</h3>
             <p className="text-muted-foreground mb-4">Start by adding your talented staff members.</p>
-            <Link href="/admin/professionals/new" passHref legacyBehavior>
+            <Link href="/admin/professionals/new">
               <Button>Add First Professional</Button>
             </Link>
           </CardContent>
@@ -58,11 +59,10 @@ export default function ProfessionalsPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
+                  <DropdownMenuItem asChild>
                     <Link
                       href={`/admin/professionals/${prof.id}/edit`}
-                      className="flex items-center w-full"
-                      legacyBehavior>
+                      className="flex items-center w-full">
                       <Edit className="mr-2 h-4 w-4" /> Edit Profile
                     </Link>
                   </DropdownMenuItem>
@@ -78,7 +78,7 @@ export default function ProfessionalsPage() {
               <p className="text-sm text-muted-foreground">Services offered: Haircuts, Fades, Beard Trims</p>
             </CardContent>
             <CardFooter>
-                <Link href={`/admin/slots?professional=${prof.id}`} className="w-full" passHref legacyBehavior>
+                <Link href={`/admin/slots?professional=${prof.id}`} className="w-full">
                     <Button variant="outline" className="w-full">Manage Availability</Button>
                 </Link>
             </CardFooter>

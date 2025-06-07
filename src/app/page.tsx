@@ -1,3 +1,4 @@
+
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { GlobalHeader } from '@/components/shared/GlobalHeader';
@@ -20,12 +21,12 @@ export default function HomePage() {
               The seamless appointment scheduling solution for modern barbershops and salons. Elevate your business and delight your clients.
             </p>
             <div className="flex justify-center gap-4">
-              <Link href="/appointments" legacyBehavior>
+              <Link href="/appointments">
                 <Button size="lg" variant="default" className="bg-accent hover:bg-accent/90 text-accent-foreground">
                   Book an Appointment
                 </Button>
               </Link>
-              <Link href="/auth/signup" legacyBehavior>
+              <Link href="/auth/signup">
                 <Button size="lg" variant="outline">
                   List Your Salon
                 </Button>

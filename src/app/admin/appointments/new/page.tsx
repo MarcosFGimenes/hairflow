@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -192,7 +193,7 @@ export default function NewAppointmentPage() {
             </div>
             
             <div className="flex justify-end gap-3 pt-6 border-t">
-              <Link href="/admin/appointments" passHref legacyBehavior>
+              <Link href="/admin/appointments">
                 <Button variant="outline" type="button">Cancel</Button>
               </Link>
               <Button type="submit" className="bg-primary hover:bg-primary/90">

@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -51,7 +52,7 @@ export function AdminSidebar() {
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.href}>
-              <Link href={item.href} passHref legacyBehavior>
+              <Link href={item.href}>
                 <SidebarMenuButton
                   isActive={pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href))}
                   tooltip={item.label}
@@ -71,7 +72,7 @@ export function AdminSidebar() {
       <SidebarFooter className="p-4 space-y-2">
          <div className="flex items-center gap-3 group-data-[collapsible=icon]:hidden">
             <Avatar className="h-9 w-9">
-              <AvatarImage src="https://placehold.co/100x100.png" alt="Admin" data-ai-hint="person avatar" />
+              <AvatarImage src="https://placehold.co/100x100.png" alt="Admin" data-ai-hint="person avatar"/>
               <AvatarFallback>AD</AvatarFallback>
             </Avatar>
             <div>

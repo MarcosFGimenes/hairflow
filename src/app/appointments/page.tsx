@@ -1,3 +1,4 @@
+
 "use client";
 
 import { GlobalHeader } from '@/components/shared/GlobalHeader';
@@ -85,7 +86,7 @@ export default function AppointmentsLandingPage() {
                             <CardDescription>{salon.address}</CardDescription>
                         </CardHeader>
                         <CardFooter>
-                            <Link href={`/appointments/${salon.slug}`} passHref legacyBehavior>
+                            <Link href={`/appointments/${salon.slug}`}>
                                 <Button className="w-full bg-primary hover:bg-primary/90">View Availability</Button>
                             </Link>
                         </CardFooter>

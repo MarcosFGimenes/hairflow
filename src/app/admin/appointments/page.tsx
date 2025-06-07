@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from 'next/link';
@@ -55,7 +56,7 @@ export default function AppointmentsPage() {
         title="Manage Appointments"
         description="View, edit, and manage all client bookings."
         actions={
-          <Link href="/admin/appointments/new" passHref legacyBehavior>
+          <Link href="/admin/appointments/new">
             <Button><PlusCircle className="mr-2 h-4 w-4" /> New Appointment</Button>
           </Link>
         }
@@ -120,19 +121,17 @@ export default function AppointmentsPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
+                        <DropdownMenuItem asChild>
                           <Link
                             href={`/admin/appointments/${appt.id}`}
-                            className="flex items-center w-full"
-                            legacyBehavior>
+                            className="flex items-center w-full">
                             <Eye className="mr-2 h-4 w-4" /> View Details
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem>
+                        <DropdownMenuItem asChild>
                           <Link
                             href={`/admin/appointments/${appt.id}/edit`}
-                            className="flex items-center w-full"
-                            legacyBehavior>
+                            className="flex items-center w-full">
                             <Edit className="mr-2 h-4 w-4" /> Edit
                           </Link>
                         </DropdownMenuItem>
