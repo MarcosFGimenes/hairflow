@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/shared/Logo';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -18,6 +17,12 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { signInWithEmailAndPassword } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useRouter } from 'next/navigation';
+import { useToast } from "@/hooks/use-toast";
+import { useState } from 'react';
+import { Loader2 } from 'lucide-react';
 
 const loginSchema = z.object({
   email: z.string().email({ message: "Invalid email address." }),
@@ -27,6 +32,10 @@ const loginSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 
 export default function LoginPage() {
+  const router = useRouter();
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(false);
+
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
@@ -35,12 +44,27 @@ export default function LoginPage() {
     },
   });
 
-  const onSubmit = (data: LoginFormValues) => {
-    console.log("Login data:", data);
-    // TODO: Implement actual login logic with Firebase or other auth provider
-    // For now, redirect to admin dashboard
-    if (typeof window !== "undefined") {
-      window.location.href = "/admin";
+  const onSubmit = async (data: LoginFormValues) => {
+    setIsLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, data.email, data.password);
+      toast({ title: "Login Successful", description: "Redirecting to dashboard..." });
+      router.push("/admin");
+    } catch (error: any) {
+      console.error("Login error:", error);
+      let errorMessage = "An unexpected error occurred.";
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        errorMessage = "Invalid email or password.";
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = "The email address is not valid.";
+      }
+      toast({
+        title: "Login Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -64,7 +88,7 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Email Address</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="you@example.com" {...field} />
+                      <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -77,20 +101,20 @@ export default function LoginPage() {
                   <FormItem>
                     <FormLabel>Password</FormLabel>
                     <FormControl>
-                      <Input type="password" placeholder="••••••••" {...field} />
+                      <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full text-lg py-6 bg-primary hover:bg-primary/90">
+              <Button type="submit" className="w-full text-lg py-6 bg-primary hover:bg-primary/90" disabled={isLoading}>
+                {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
                 Log In
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center gap-2">
-          {/* This is the updated link */}
           <Link href="/auth/forgot-password">
             <Button variant="link" className="text-sm text-muted-foreground">Forgot password?</Button>
           </Link>
