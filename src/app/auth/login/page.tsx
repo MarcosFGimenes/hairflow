@@ -90,7 +90,7 @@ export default function LoginPage() {
         </CardContent>
         <CardFooter className="flex flex-col items-center gap-2">
           {/* This is the updated link */}
-          <Link href="/auth/forgot-password">
+          <Link href="/auth/forgot-password" legacyBehavior>
             <Button variant="link" className="text-sm text-muted-foreground">Forgot password?</Button>
           </Link>
           <p className="text-sm text-muted-foreground">

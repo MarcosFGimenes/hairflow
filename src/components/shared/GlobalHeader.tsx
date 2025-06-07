@@ -14,18 +14,18 @@ export function GlobalHeader() {
       <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Logo />
         <nav className="flex items-center gap-4">
-          <Link href="/appointments">
+          <Link href="/appointments" legacyBehavior>
             <Button variant="ghost">Book Now</Button>
           </Link>
 
           {isAuthenticated ? (
             <>
               {isAdmin && (
-                <Link href="/admin">
+                <Link href="/admin" legacyBehavior>
                   <Button variant="outline">Admin Panel</Button>
                 </Link>
               )}
-              <Link href="/profile">
+              <Link href="/profile" legacyBehavior>
                 <Button variant="ghost" size="icon">
                   <UserCircle className="h-5 w-5" />
                   <span className="sr-only">Profile</span>
@@ -33,7 +33,7 @@ export function GlobalHeader() {
               </Link>
             </>
           ) : (
-            <Link href="/auth/login">
+            <Link href="/auth/login" legacyBehavior>
               <Button variant="default">
                 <LogIn className="mr-2 h-4 w-4" /> Salon Login
               </Button>
