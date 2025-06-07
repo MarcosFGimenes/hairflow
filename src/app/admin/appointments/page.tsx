@@ -2,18 +2,20 @@
 "use client";
 
 import Link from 'next/link';
+import React, { useState, useEffect } from 'react'; // Added useState and useEffect
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, PlusCircle, Filter, Eye, Edit, Trash2, CheckCircle, XCircle, Hourglass } from 'lucide-react';
+import { MoreHorizontal, PlusCircle, Filter, Eye, Edit, Trash2, CheckCircle, XCircle, Hourglass, Loader2 } from 'lucide-react';
 import { placeholderAppointments, placeholderProfessionals } from '@/lib/placeholder-data';
 import type { Appointment } from '@/lib/types';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
 
 // Function to get professional name
 const getProfessionalName = (profId: string) => {
@@ -28,9 +30,9 @@ const formatDateTime = (date: Date) => {
 
 const statusBadgeVariant = (status: Appointment['status']): "default" | "secondary" | "destructive" | "outline" => {
   switch (status) {
-    case 'confirmed': return 'default'; // Using 'default' for a positive/confirmed status
+    case 'confirmed': return 'default';
     case 'scheduled': return 'secondary';
-    case 'completed': return 'outline'; // Could be greenish, using outline for now
+    case 'completed': return 'outline';
     case 'cancelled': return 'destructive';
     default: return 'secondary';
   }
@@ -48,7 +50,44 @@ const statusIcon = (status: Appointment['status']) => {
 
 
 export default function AppointmentsPage() {
-  const appointments = placeholderAppointments; // Assume these are for the logged-in salon
+  const { user, loading: authLoading } = useAuth();
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    if (!authLoading && user) {
+      // Filter placeholderAppointments based on the logged-in user's salonId (user.uid)
+      // In a real app, you would fetch appointments from Firestore filtered by salonId
+      const userSalonId = user.uid;
+      const filtered = placeholderAppointments.filter(appt => appt.salonId === userSalonId);
+      setAppointments(filtered);
+      setIsLoading(false);
+    } else if (!authLoading && !user) {
+      // No user, so no appointments to show, or redirect handled by AdminLayout
+      setAppointments([]);
+      setIsLoading(false);
+    }
+  }, [user, authLoading]);
+
+  if (authLoading || isLoading) {
+    return (
+      <>
+        <PageHeader 
+          title="Manage Appointments"
+          description="View, edit, and manage all client bookings."
+          actions={
+            <Link href="/admin/appointments/new">
+              <Button disabled><PlusCircle className="mr-2 h-4 w-4" /> New Appointment</Button>
+            </Link>
+          }
+        />
+        <div className="flex min-h-[calc(100vh-300px)] items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary" />
+          <p className="ml-4 text-lg">Loading appointments...</p>
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
@@ -65,7 +104,7 @@ export default function AppointmentsPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <CardTitle className="font-headline">All Bookings</CardTitle>
+              <CardTitle className="font-headline">Your Salon's Bookings</CardTitle>
               <CardDescription>A list of all appointments for your salon.</CardDescription>
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
@@ -75,6 +114,7 @@ export default function AppointmentsPage() {
                   <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Filter</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {/* These should be actual SelectItems, not DropdownMenuItems for a select-like filter */}
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="scheduled">Scheduled</SelectItem>
                   <SelectItem value="confirmed">Confirmed</SelectItem>
@@ -147,7 +187,7 @@ export default function AppointmentsPage() {
           </Table>
           {appointments.length === 0 && (
             <div className="text-center py-10 text-muted-foreground">
-              No appointments found.
+              No appointments found for your salon.
             </div>
           )}
         </CardContent>
@@ -155,3 +195,4 @@ export default function AppointmentsPage() {
     </>
   );
 }
+
