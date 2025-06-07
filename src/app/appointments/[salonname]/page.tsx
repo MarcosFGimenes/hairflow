@@ -48,6 +48,7 @@ export default function SalonAppointmentPage() {
   const [selectedService, setSelectedService] = useState<string>("Standard Haircut"); 
   const services = ["Standard Haircut", "Beard Trim", "Hair Wash & Style", "Kids Cut"];
 
+  const currentProfessional = useMemo(() => professionals.find(p => p.id === selectedProfessionalId), [professionals, selectedProfessionalId]);
 
   useEffect(() => {
     const currentSalon = placeholderSalons.find(s => s.slug === salonSlug);
@@ -103,8 +104,8 @@ export default function SalonAppointmentPage() {
   const handleSubmitBooking = () => {
     if (!salon || !selectedProfessionalId || !selectedSlot || !clientName || !clientPhone || !selectedService) return;
     
-    const professional = professionals.find(p => p.id === selectedProfessionalId);
-    if (!professional) return;
+    // currentProfessional is already available from useMemo above
+    if (!currentProfessional) return;
 
     const newAppointment: Appointment = {
       id: `appt-${Date.now()}`,
@@ -136,7 +137,6 @@ export default function SalonAppointmentPage() {
     );
   }
 
-  const currentProfessional = useMemo(() => professionals.find(p => p.id === selectedProfessionalId), [professionals, selectedProfessionalId]);
 
   return (
     <>
@@ -293,4 +293,3 @@ export default function SalonAppointmentPage() {
     </>
   );
 }
-
