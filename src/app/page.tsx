@@ -20,12 +20,12 @@ export default function HomePage() {
               The seamless appointment scheduling solution for modern barbershops and salons. Elevate your business and delight your clients.
             </p>
             <div className="flex justify-center gap-4">
-              <Link href="/appointments" passHref legacyBehavior>
+              <Link href="/appointments">
                 <Button size="lg" variant="default" className="bg-accent hover:bg-accent/90 text-accent-foreground">
                   Book an Appointment
                 </Button>
               </Link>
-              <Link href="/auth/signup" passHref legacyBehavior>
+              <Link href="/auth/signup">
                 <Button size="lg" variant="outline">
                   List Your Salon
                 </Button>
@@ -64,13 +64,13 @@ export default function HomePage() {
             <h2 className="text-4xl font-bold font-headline text-center mb-12 text-primary">How It Works</h2>
             <div className="grid md:grid-cols-2 gap-8 items-center">
               <div>
-                <Image 
-                  src="https://placehold.co/600x400.png" 
-                  alt="Salon dashboard preview" 
-                  width={600} 
-                  height={400} 
+                <Image
+                  src="https://placehold.co/600x400.png"
+                  alt="Salon dashboard preview"
+                  width={600}
+                  height={400}
                   className="rounded-lg shadow-xl"
-                  data-ai-hint="salon dashboard" 
+                  data-ai-hint="salon dashboard"
                 />
               </div>
               <div className="space-y-6">

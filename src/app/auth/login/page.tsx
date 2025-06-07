@@ -39,7 +39,7 @@ export default function LoginPage() {
     // TODO: Implement actual login logic with Firebase or other auth provider
     // For now, redirect to admin dashboard
     if (typeof window !== "undefined") {
-     window.location.href = "/admin";
+      window.location.href = "/admin";
     }
   };
 
@@ -89,7 +89,8 @@ export default function LoginPage() {
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center gap-2">
-          <Link href="/auth/forgot-password" passHref legacyBehavior>
+          {/* This is the updated link */}
+          <Link href="/auth/forgot-password">
             <Button variant="link" className="text-sm text-muted-foreground">Forgot password?</Button>
           </Link>
           <p className="text-sm text-muted-foreground">

@@ -25,7 +25,6 @@ export default function ProfessionalsPage() {
           </Link>
         }
       />
-
       {professionals.length === 0 && (
         <Card className="shadow-lg">
           <CardContent className="py-10 text-center">
@@ -38,7 +37,6 @@ export default function ProfessionalsPage() {
           </CardContent>
         </Card>
       )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {professionals.map((prof) => (
           <Card key={prof.id} className="shadow-lg hover:shadow-xl transition-shadow flex flex-col">
@@ -61,7 +59,10 @@ export default function ProfessionalsPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem>
-                    <Link href={`/admin/professionals/${prof.id}/edit`} className="flex items-center w-full">
+                    <Link
+                      href={`/admin/professionals/${prof.id}/edit`}
+                      className="flex items-center w-full"
+                      legacyBehavior>
                       <Edit className="mr-2 h-4 w-4" /> Edit Profile
                     </Link>
                   </DropdownMenuItem>

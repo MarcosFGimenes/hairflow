@@ -257,15 +257,15 @@ export default function SalonAppointmentPage() {
             
             {currentStep === 4 && confirmedAppointment && salon && currentProfessional && (
               // The ConfirmationDialog will be triggered separately. This is a placeholder or success message.
-               <div className="text-center py-10">
-                  <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                  <h2 className="text-3xl font-bold font-headline text-primary">Booking Successful!</h2>
-                  <p className="text-muted-foreground mt-2">Your appointment is confirmed. You will receive details shortly.</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Check the confirmation pop-up for WhatsApp sharing options.
-                  </p>
-                  <Button onClick={() => router.push('/')} className="mt-8">Back to Homepage</Button>
-              </div>
+               (<div className="text-center py-10">
+                 <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                 <h2 className="text-3xl font-bold font-headline text-primary">Booking Successful!</h2>
+                 <p className="text-muted-foreground mt-2">Your appointment is confirmed. You will receive details shortly.</p>
+                 <p className="mt-1 text-sm text-muted-foreground">
+                   Check the confirmation pop-up for WhatsApp sharing options.
+                 </p>
+                 <Button onClick={() => router.push('/')} className="mt-8">Back to Homepage</Button>
+               </div>)
             )}
 
             {currentStep < 4 && (

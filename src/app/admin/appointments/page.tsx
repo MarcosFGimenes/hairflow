@@ -60,7 +60,6 @@ export default function AppointmentsPage() {
           </Link>
         }
       />
-
       <Card className="shadow-lg">
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -122,12 +121,18 @@ export default function AppointmentsPage() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem>
-                          <Link href={`/admin/appointments/${appt.id}`} className="flex items-center w-full">
+                          <Link
+                            href={`/admin/appointments/${appt.id}`}
+                            className="flex items-center w-full"
+                            legacyBehavior>
                             <Eye className="mr-2 h-4 w-4" /> View Details
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem>
-                          <Link href={`/admin/appointments/${appt.id}/edit`} className="flex items-center w-full">
+                          <Link
+                            href={`/admin/appointments/${appt.id}/edit`}
+                            className="flex items-center w-full"
+                            legacyBehavior>
                             <Edit className="mr-2 h-4 w-4" /> Edit
                           </Link>
                         </DropdownMenuItem>

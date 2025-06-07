@@ -6,7 +6,7 @@ import { UserCircle, LogIn } from 'lucide-react';
 
 export function GlobalHeader() {
   // Placeholder for authentication status
-  const isAuthenticated = false; 
+  const isAuthenticated = false;
   const isAdmin = false;
 
   return (
@@ -14,18 +14,18 @@ export function GlobalHeader() {
       <div className="container mx-auto flex h-16 max-w-screen-2xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <Logo />
         <nav className="flex items-center gap-4">
-          <Link href="/appointments" legacyBehavior passHref>
+          <Link href="/appointments">
             <Button variant="ghost">Book Now</Button>
           </Link>
-          
+
           {isAuthenticated ? (
             <>
               {isAdmin && (
-                <Link href="/admin" legacyBehavior passHref>
+                <Link href="/admin">
                   <Button variant="outline">Admin Panel</Button>
                 </Link>
               )}
-              <Link href="/profile" legacyBehavior passHref>
+              <Link href="/profile">
                 <Button variant="ghost" size="icon">
                   <UserCircle className="h-5 w-5" />
                   <span className="sr-only">Profile</span>
@@ -33,7 +33,7 @@ export function GlobalHeader() {
               </Link>
             </>
           ) : (
-            <Link href="/auth/login" legacyBehavior passHref>
+            <Link href="/auth/login">
               <Button variant="default">
                 <LogIn className="mr-2 h-4 w-4" /> Salon Login
               </Button>
