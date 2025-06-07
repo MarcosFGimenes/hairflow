@@ -9,12 +9,10 @@ if (typeof window === 'undefined') {
   console.log("----------------------------------------------------");
 }
 
-// Import the functions you need from the SDKs you need
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
-import { getFirestore } from "firebase/firestore"; // Import Firestore
+import { getAuth, type Auth } from "firebase/auth"; // Import Auth type
+import { getFirestore, type FirebaseFirestore } from "firebase/firestore"; // Import Firestore and its type
 
-// Your web app's Firebase configuration, now read from environment variables
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -24,35 +22,9 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID
 };
 
-// CLIENT-SIDE CHECK: Log environment variables when this code runs in the browser.
-// This will appear in the browser's developer console.
-if (typeof window !== 'undefined') {
-  console.log("--- CLIENT-SIDE Firebase Env Check (Runtime) ---");
-  const clientApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  const clientAuthDomain = process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN;
-  const clientProjectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
-
-  console.log("CLIENT: process.env.NEXT_PUBLIC_FIREBASE_API_KEY raw:", `"${clientApiKey}"`);
-  console.log("CLIENT: typeof process.env.NEXT_PUBLIC_FIREBASE_API_KEY:", typeof clientApiKey);
-  console.log("CLIENT: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN:", clientAuthDomain);
-  console.log("CLIENT: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID:", clientProjectId);
-
-  if (!clientApiKey) {
-    console.error("CLIENT-SIDE ERROR: NEXT_PUBLIC_FIREBASE_API_KEY is missing or undefined in the browser. Check .env.local and server restart.");
-  } else if (typeof clientApiKey !== 'string' || clientApiKey.trim() === '') {
-    console.error("CLIENT-SIDE ERROR: NEXT_PUBLIC_FIREBASE_API_KEY is not a valid string or is empty in the browser. Value:", `"${clientApiKey}"`);
-  }
-  console.log("--------------------------------------------------");
-  console.log("CLIENT: Full firebaseConfig object being used (API key masked for log):", {
-    apiKey: firebaseConfig.apiKey ? '********' : firebaseConfig.apiKey,
-    authDomain: firebaseConfig.authDomain,
-    projectId: firebaseConfig.projectId,
-  });
-}
-
-
-// Initialize Firebase
 let app: FirebaseApp;
+let authInstance: Auth; // Use a different name to avoid conflict before export
+let dbInstance: FirebaseFirestore; // Use a different name
 
 // Pre-check before initializing to give clearer errors if config is bad
 if (!firebaseConfig.apiKey || typeof firebaseConfig.apiKey !== 'string' || firebaseConfig.apiKey.trim() === '') {
@@ -65,6 +37,8 @@ if (!firebaseConfig.apiKey || typeof firebaseConfig.apiKey !== 'string' || fireb
       throw new Error("FATAL: Firebase API Key is completely missing. Cannot initialize Firebase on server.");
     } else { // Client-side
       console.error("FATAL CLIENT ERROR: Firebase API Key is completely missing. Firebase will not work.");
+      // For client-side, don't throw, allow app to attempt to render something.
+      // Services will be undefined.
     }
   }
 }
@@ -73,31 +47,54 @@ if (!firebaseConfig.apiKey || typeof firebaseConfig.apiKey !== 'string' || fireb
 if (!getApps().length) {
   try {
     app = initializeApp(firebaseConfig);
+    authInstance = getAuth(app);
+    dbInstance = getFirestore(app);
     if (typeof window !== 'undefined') {
-      console.log("CLIENT: Firebase app initialized successfully.");
+      console.log("CLIENT: Firebase app and services initialized successfully.");
     } else {
-      console.log("SERVER: Firebase app initialized successfully.");
+      console.log("SERVER: Firebase app and services initialized successfully.");
     }
   } catch (error) {
     const problemSource = typeof window === 'undefined' ? "SERVER-SIDE" : "CLIENT-SIDE";
     console.error(`${problemSource} Firebase initializeApp() FAILED. Error:`, error);
     console.error(`${problemSource} This usually means the firebaseConfig object was invalid (often API key). Review env vars and server restart.`);
-    // Do not re-throw here for client-side, let the app try to display something.
-    // For server-side, re-throwing might be okay or might stop the build.
     if (typeof window === 'undefined') {
-        throw error;
+        throw error; // Re-throw on server to make it obvious
     }
+    // On client, app, authInstance, dbInstance will remain undefined if an error occurs here
   }
 } else {
   app = getApp();
+  authInstance = getAuth(app); // Ensure services are initialized with the existing app
+  dbInstance = getFirestore(app);
   if (typeof window !== 'undefined') {
-    console.log("CLIENT: Firebase app already initialized, getting existing instance.");
+    console.log("CLIENT: Firebase app already initialized, getting existing instance and services.");
   } else {
-    console.log("SERVER: Firebase app already initialized, getting existing instance.");
+    console.log("SERVER: Firebase app already initialized, getting existing instance and services.");
   }
 }
 
-const auth = getAuth(app);
-const db = getFirestore(app); // Initialize Firestore and export it
+// CLIENT-SIDE CHECK: Log environment variables when this code runs in the browser.
+if (typeof window !== 'undefined') {
+  console.log("--- CLIENT-SIDE Firebase Config Check (After Init Attempt) ---");
+  const clientApiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+  console.log("CLIENT: process.env.NEXT_PUBLIC_FIREBASE_API_KEY raw:", `"${clientApiKey}"`);
+  if (!clientApiKey || typeof clientApiKey !== 'string' || clientApiKey.trim() === '') {
+    console.error("CLIENT-SIDE ERROR: NEXT_PUBLIC_FIREBASE_API_KEY is still problematic after init attempt. Value:", `"${clientApiKey}"`);
+  }
+  console.log("CLIENT: Full firebaseConfig object being used (API key masked for log):", {
+    apiKey: firebaseConfig.apiKey ? '********' : firebaseConfig.apiKey,
+    authDomain: firebaseConfig.authDomain,
+    projectId: firebaseConfig.projectId,
+  });
+  console.log("CLIENT: `app` instance initialized:", !!app);
+  console.log("CLIENT: `authInstance` initialized:", !!authInstance);
+  console.log("CLIENT: `dbInstance` initialized:", !!dbInstance);
+  console.log("------------------------------------------------------------");
+}
+
+// Assign to final exported variables. These might be undefined if initialization failed.
+const auth = authInstance;
+const db = dbInstance;
 
 export { app, auth, db };
