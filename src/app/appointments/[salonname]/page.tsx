@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -13,9 +14,10 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { placeholderSalons, placeholderProfessionals, placeholderTimeSlots, placeholderAppointments } from '@/lib/placeholder-data';
+import { getSalonBySlug } from '@/lib/firestoreService'; // Import service
+import { placeholderProfessionals, placeholderTimeSlots, placeholderAppointments } from '@/lib/placeholder-data'; // Professionals and slots still placeholder for now
 import type { Salon, Professional, TimeSlot, Appointment } from '@/lib/types';
-import { User, Phone, Briefcase, Calendar as CalendarIconLucide, Clock, CheckCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import { User, Phone, Briefcase, Calendar as CalendarIconLucide, Clock, CheckCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import Image from 'next/image';
 
@@ -33,7 +35,8 @@ export default function SalonAppointmentPage() {
 
   const [currentStep, setCurrentStep] = useState(1);
   const [salon, setSalon] = useState<Salon | null>(null);
-  const [professionals, setProfessionals] = useState<Professional[]>([]);
+  const [isLoadingSalon, setIsLoadingSalon] = useState(true);
+  const [professionals, setProfessionals] = useState<Professional[]>([]); // Will be fetched later
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string | undefined>();
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
@@ -44,34 +47,44 @@ export default function SalonAppointmentPage() {
   const [confirmedAppointment, setConfirmedAppointment] = useState<Appointment | null>(null);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   
-  // Service selection (simplified)
   const [selectedService, setSelectedService] = useState<string>("Standard Haircut"); 
-  const services = ["Standard Haircut", "Beard Trim", "Hair Wash & Style", "Kids Cut"];
+  const services = ["Standard Haircut", "Beard Trim", "Hair Wash & Style", "Kids Cut"]; // Placeholder
 
   const currentProfessional = useMemo(() => professionals.find(p => p.id === selectedProfessionalId), [professionals, selectedProfessionalId]);
 
   useEffect(() => {
-    const currentSalon = placeholderSalons.find(s => s.slug === salonSlug);
-    if (currentSalon) {
-      setSalon(currentSalon);
-      const salonProfessionals = placeholderProfessionals.filter(p => p.salonId === currentSalon.id);
-      setProfessionals(salonProfessionals);
-      if (salonProfessionals.length > 0) {
-        setSelectedProfessionalId(salonProfessionals[0].id); // Default to first professional
-      }
-    } else {
-      // Handle salon not found, maybe redirect or show error
-      // router.push('/404'); 
+    if (salonSlug) {
+      const fetchSalon = async () => {
+        setIsLoadingSalon(true);
+        const fetchedSalon = await getSalonBySlug(salonSlug);
+        if (fetchedSalon) {
+          setSalon(fetchedSalon);
+          // TODO: Fetch professionals for this salon
+          // For now, using placeholder professionals filtered by a known ID if available
+          // This part needs to be replaced with actual professional fetching for fetchedSalon.id
+          const salonProfessionals = placeholderProfessionals.filter(p => p.salonId === fetchedSalon.id || p.salonId === 'salon1'); // Temporary fallback
+          setProfessionals(salonProfessionals);
+          if (salonProfessionals.length > 0) {
+            setSelectedProfessionalId(salonProfessionals[0].id);
+          }
+        } else {
+          // Handle salon not found
+          toast({ title: "Salon Not Found", description: "This salon does not exist or the URL is incorrect.", variant: "destructive"});
+          // router.push('/404'); // Or a dedicated not found page
+        }
+        setIsLoadingSalon(false);
+      };
+      fetchSalon();
     }
   }, [salonSlug, router]);
 
   useEffect(() => {
     if (selectedDate && selectedProfessionalId && salon) {
       setIsLoadingSlots(true);
-      // Simulate API call
+      // Simulate API call for slots - this needs to be real data fetching
       setTimeout(() => {
         const slotsForDayAndProf = placeholderTimeSlots.filter(slot =>
-          slot.salonId === salon.id &&
+          slot.salonId === salon.id && // This might need adjustment if placeholderTimeSlots don't match dynamic salon.id
           slot.professionalId === selectedProfessionalId &&
           new Date(slot.startTime).toDateString() === selectedDate.toDateString() &&
           !slot.isBooked 
@@ -82,7 +95,7 @@ export default function SalonAppointmentPage() {
     } else {
       setAvailableSlots([]);
     }
-    setSelectedSlot(null); // Reset selected slot when date or prof changes
+    setSelectedSlot(null);
   }, [selectedDate, selectedProfessionalId, salon]);
 
   const handleNextStep = () => {
@@ -102,13 +115,12 @@ export default function SalonAppointmentPage() {
   const handlePrevStep = () => { if (currentStep > 1) setCurrentStep(currentStep -1);};
 
   const handleSubmitBooking = () => {
+    // TODO: Implement actual appointment saving to Firestore
     if (!salon || !selectedProfessionalId || !selectedSlot || !clientName || !clientPhone || !selectedService) return;
-    
-    // currentProfessional is already available from useMemo above
     if (!currentProfessional) return;
 
     const newAppointment: Appointment = {
-      id: `appt-${Date.now()}`,
+      id: `appt-${Date.now()}`, // Firestore will generate ID
       salonId: salon.id,
       professionalId: selectedProfessionalId,
       clientName,
@@ -116,12 +128,27 @@ export default function SalonAppointmentPage() {
       serviceName: selectedService,
       startTime: selectedSlot.startTime,
       endTime: selectedSlot.endTime,
-      status: 'confirmed', // Auto-confirm for demo
+      status: 'scheduled', // Initially scheduled, admin can confirm
     };
-    setConfirmedAppointment(newAppointment);
+    setConfirmedAppointment(newAppointment); // For dialog
     setIsConfirming(true);
-    setCurrentStep(4); // Move to confirmation step display
+    setCurrentStep(4); 
+    console.log("Booking submitted (visual only):", newAppointment);
+    toast({ title: "Booking Submitted (Demo)", description: "Your appointment request has been sent."});
   };
+
+  if (isLoadingSalon) {
+    return (
+      <>
+        <GlobalHeader />
+        <main className="container mx-auto px-4 py-8 flex-grow text-center flex flex-col items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
+          <p className="text-lg text-muted-foreground">Loading salon details...</p>
+        </main>
+        <GlobalFooter />
+      </>
+    );
+  }
 
   if (!salon) {
     return (
@@ -148,10 +175,10 @@ export default function SalonAppointmentPage() {
             <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4 text-center">
               <h1 className="text-3xl md:text-5xl font-bold font-headline text-white mb-2">{salon.name}</h1>
               {salon.address && <p className="text-lg text-gray-200">{salon.address}</p>}
+              {salon.description && <p className="text-sm text-gray-300 mt-2 max-w-xl">{salon.description}</p>}
             </div>
           </div>
 
-          {/* Progress Bar */}
           <div className="p-6 border-b">
             <div className="flex items-center justify-between mb-2">
               {steps.map((step, index) => (
@@ -174,26 +201,30 @@ export default function SalonAppointmentPage() {
                 <BookingCalendar selectedDate={selectedDate} onDateSelect={setSelectedDate} />
                 <div>
                   <Label htmlFor="professional" className="text-lg font-semibold mb-2 block text-center">Select Professional</Label>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {professionals.map(prof => (
-                      <Card 
-                        key={prof.id} 
-                        onClick={() => setSelectedProfessionalId(prof.id)}
-                        className={`p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 ${selectedProfessionalId === prof.id ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
-                      >
-                        <div className="flex items-center gap-4">
-                          <Avatar className="h-16 w-16">
-                            <AvatarImage src={prof.imageUrl} alt={prof.name} data-ai-hint="person beauty" />
-                            <AvatarFallback>{prof.name.substring(0,1)}</AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <h3 className="font-semibold text-lg">{prof.name}</h3>
-                            <p className="text-sm text-muted-foreground">{prof.specialty}</p>
+                  {professionals.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {professionals.map(prof => (
+                        <Card 
+                          key={prof.id} 
+                          onClick={() => setSelectedProfessionalId(prof.id)}
+                          className={`p-4 cursor-pointer hover:shadow-lg transition-shadow border-2 ${selectedProfessionalId === prof.id ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <Avatar className="h-16 w-16">
+                              <AvatarImage src={prof.imageUrl || `https://placehold.co/100x100.png`} alt={prof.name} data-ai-hint="person beauty" />
+                              <AvatarFallback>{prof.name.substring(0,1)}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <h3 className="font-semibold text-lg">{prof.name}</h3>
+                              <p className="text-sm text-muted-foreground">{prof.specialty}</p>
+                            </div>
                           </div>
-                        </div>
-                      </Card>
-                    ))}
-                  </div>
+                        </Card>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-center text-muted-foreground">No professionals available for this salon yet. (Placeholder)</p>
+                  )}
                 </div>
               </div>
             )}
@@ -256,13 +287,12 @@ export default function SalonAppointmentPage() {
             )}
             
             {currentStep === 4 && confirmedAppointment && salon && currentProfessional && (
-              // The ConfirmationDialog will be triggered separately. This is a placeholder or success message.
                (<div className="text-center py-10">
                  <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                 <h2 className="text-3xl font-bold font-headline text-primary">Booking Successful!</h2>
-                 <p className="text-muted-foreground mt-2">Your appointment is confirmed. You will receive details shortly.</p>
+                 <h2 className="text-3xl font-bold font-headline text-primary">Booking Submitted! (Demo)</h2>
+                 <p className="text-muted-foreground mt-2">Your appointment request is sent. You will receive confirmation once approved.</p>
                  <p className="mt-1 text-sm text-muted-foreground">
-                   Check the confirmation pop-up for WhatsApp sharing options.
+                   Check the confirmation pop-up for WhatsApp sharing options (if applicable).
                  </p>
                  <Button onClick={() => router.push('/')} className="mt-8">Back to Homepage</Button>
                </div>)
@@ -281,7 +311,8 @@ export default function SalonAppointmentPage() {
         </Card>
       </main>
       <GlobalFooter />
-      {confirmedAppointment && salon && currentProfessional && (
+      {/* Confirmation dialog should only show for actual confirmed bookings from Firestore in a real scenario */}
+      {isConfirming && confirmedAppointment && salon && currentProfessional && (
         <ConfirmationDialog
           isOpen={isConfirming}
           onOpenChange={setIsConfirming}
@@ -293,3 +324,7 @@ export default function SalonAppointmentPage() {
     </>
   );
 }
+
+// Helper for toast, can be moved to a utils file
+import { useToast } from "@/hooks/use-toast"; 
+const { toast } = useToast();

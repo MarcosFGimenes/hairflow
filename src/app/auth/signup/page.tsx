@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/form";
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
+import { createSalon } from '@/lib/firestoreService'; // Import createSalon
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { useState } from 'react';
@@ -54,13 +55,17 @@ export default function SignupPage() {
   const onSubmit = async (data: SignupFormValues) => {
     setIsLoading(true);
     try {
-      // TODO: In a real app, you'd also save salonName to Firestore linked to the user's UID
       const userCredential = await createUserWithEmailAndPassword(auth, data.email, data.password);
-      console.log("User signed up:", userCredential.user);
-      console.log("Salon name to save:", data.salonName); // Placeholder for Firestore logic
-
-      toast({ title: "Signup Successful", description: "Redirecting to dashboard..." });
-      router.push("/admin"); 
+      const user = userCredential.user;
+      
+      if (user) {
+        // After user is created in Auth, create the salon document in Firestore
+        await createSalon(user.uid, data.salonName, user.email || data.email); // Pass user.email or form email
+        toast({ title: "Signup Successful", description: "Salon created. Redirecting to dashboard..." });
+        router.push("/admin"); 
+      } else {
+        throw new Error("User creation failed.");
+      }
     } catch (error: any) {
       console.error("Signup error:", error);
       let errorMessage = "An unexpected error occurred.";
