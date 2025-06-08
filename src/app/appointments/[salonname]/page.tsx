@@ -51,6 +51,9 @@ export default function SalonAppointmentPage() {
   const services = ["Standard Haircut", "Beard Trim", "Hair Wash & Style", "Kids Cut"]; // Placeholder
 
   const currentProfessional = useMemo(() => professionals.find(p => p.id === selectedProfessionalId), [professionals, selectedProfessionalId]);
+    // Helper for toast, can be moved to a utils file
+    import { useToast } from "@/hooks/use-toast"; 
+    const { toast } = useToast();
 
   useEffect(() => {
     if (salonSlug) {
@@ -324,7 +327,3 @@ export default function SalonAppointmentPage() {
     </>
   );
 }
-
-// Helper for toast, can be moved to a utils file
-import { useToast } from "@/hooks/use-toast"; 
-const { toast } = useToast();
