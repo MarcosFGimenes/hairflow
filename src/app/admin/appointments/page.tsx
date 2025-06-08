@@ -1,77 +1,114 @@
+// src/app/admin/appointments/page.tsx
 
 "use client";
 
 import Link from 'next/link';
-import React, { useState, useEffect } from 'react'; // Added useState and useEffect
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, PlusCircle, Filter, Eye, Edit, Trash2, CheckCircle, XCircle, Hourglass, Loader2 } from 'lucide-react';
-import { placeholderAppointments, placeholderProfessionals } from '@/lib/placeholder-data';
-import type { Appointment } from '@/lib/types';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { MoreHorizontal, PlusCircle, Filter, Eye, Edit, Trash2, CheckCircle, XCircle, Hourglass, Loader2, UserCheck } from 'lucide-react';
+import { getAppointmentsBySalon, getProfessionalsBySalon, updateAppointmentStatus, cancelAppointment } from '@/lib/firestoreService';
+import type { Appointment, Professional } from '@/lib/types';
 import { PageHeader } from '@/components/shared/PageHeader';
 import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from "@/hooks/use-toast";
 
-// Function to get professional name
-const getProfessionalName = (profId: string) => {
-  const prof = placeholderProfessionals.find(p => p.id === profId);
-  return prof ? prof.name : 'N/A';
-};
-
-// Function to format date and time
+// ... (Funções formatDateTime, statusBadgeVariant, statusIcon permanecem as mesmas)
 const formatDateTime = (date: Date) => {
-  return format(date, "MMM d, yyyy 'at' h:mm a");
+  return format(date, "MMM d, yyyy 'at' h:mm a");
 };
-
 const statusBadgeVariant = (status: Appointment['status']): "default" | "secondary" | "destructive" | "outline" => {
-  switch (status) {
-    case 'confirmed': return 'default';
-    case 'scheduled': return 'secondary';
-    case 'completed': return 'outline';
-    case 'cancelled': return 'destructive';
-    default: return 'secondary';
-  }
+    switch (status) {
+        case 'confirmed': return 'default';
+        case 'scheduled': return 'secondary';
+        case 'completed': return 'outline';
+        case 'cancelled': return 'destructive';
+        default: return 'secondary';
+    }
 };
-
 const statusIcon = (status: Appointment['status']) => {
-  switch (status) {
-    case 'confirmed': return <CheckCircle className="h-4 w-4 text-green-500" />;
-    case 'scheduled': return <Hourglass className="h-4 w-4 text-yellow-500" />;
-    case 'completed': return <CheckCircle className="h-4 w-4 text-blue-500" />;
-    case 'cancelled': return <XCircle className="h-4 w-4 text-red-500" />;
-    default: return null;
-  }
-}
+    switch (status) {
+        case 'confirmed': return <CheckCircle className="h-4 w-4 text-green-500" />;
+        case 'scheduled': return <Hourglass className="h-4 w-4 text-yellow-500" />;
+        case 'completed': return <CheckCircle className="h-4 w-4 text-blue-500" />;
+        case 'cancelled': return <XCircle className="h-4 w-4 text-red-500" />;
+        default: return null;
+    }
+};
 
 
 export default function AppointmentsPage() {
   const { user, loading: authLoading } = useAuth();
+  const { toast } = useToast();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
 
-  useEffect(() => {
-    if (!authLoading && user) {
-      // Filter placeholderAppointments based on the logged-in user's salonId (user.uid)
-      // In a real app, you would fetch appointments from Firestore filtered by salonId
-      const userSalonId = user.uid;
-      const filtered = placeholderAppointments.filter(appt => appt.salonId === userSalonId);
-      setAppointments(filtered);
-      setIsLoading(false);
-    } else if (!authLoading && !user) {
-      // No user, so no appointments to show, or redirect handled by AdminLayout
-      setAppointments([]);
+  const fetchAppointments = useCallback(async () => {
+    if (user) {
+      setIsLoading(true);
+      const [fetchedProfessionals, fetchedAppointments] = await Promise.all([
+        getProfessionalsBySalon(user.uid),
+        getAppointmentsBySalon(user.uid),
+      ]);
+      setProfessionals(fetchedProfessionals);
+      setAppointments(fetchedAppointments);
       setIsLoading(false);
     }
-  }, [user, authLoading]);
+  }, [user]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      fetchAppointments();
+    }
+  }, [user, authLoading, fetchAppointments]);
+
+  const handleStatusUpdate = async (appointmentId: string, status: Appointment['status']) => {
+    try {
+      await updateAppointmentStatus(appointmentId, status);
+      toast({ title: 'Sucesso', description: `Agendamento atualizado para ${status}.` });
+      fetchAppointments(); // Re-busca os dados para atualizar a UI
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Não foi possível atualizar o status.', variant: 'destructive' });
+    }
+  };
+
+  const handleCancelAppointment = async (appointmentId: string) => {
+    try {
+      await cancelAppointment(appointmentId);
+      toast({ title: 'Sucesso', description: 'Agendamento cancelado.' });
+      fetchAppointments();
+    } catch (error) {
+      toast({ title: 'Erro', description: 'Não foi possível cancelar o agendamento.', variant: 'destructive' });
+    }
+  };
+
+  const getProfessionalName = useCallback((profId: string) => {
+    const prof = professionals.find(p => p.id === profId);
+    return prof ? prof.name : 'N/A';
+  }, [professionals]);
+
+  const filteredAppointments = useMemo(() => {
+    return appointments
+      .filter(appt => statusFilter === 'all' || appt.status === statusFilter)
+      .filter(appt => 
+        appt.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        appt.serviceName.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+  }, [appointments, statusFilter, searchTerm]);
 
   if (authLoading || isLoading) {
+    // ... (tela de loading)
     return (
-      <>
+        <>
         <PageHeader 
           title="Manage Appointments"
           description="View, edit, and manage all client bookings."
@@ -86,7 +123,7 @@ export default function AppointmentsPage() {
           <p className="ml-4 text-lg">Loading appointments...</p>
         </div>
       </>
-    );
+    )
   }
 
   return (
@@ -108,18 +145,22 @@ export default function AppointmentsPage() {
               <CardDescription>A list of all appointments for your salon.</CardDescription>
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
-              <Input placeholder="Search client or service..." className="max-w-xs" />
+              <Input 
+                placeholder="Search client or service..." 
+                className="max-w-xs"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Filter</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {/* These should be actual SelectItems, not DropdownMenuItems for a select-like filter */}
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  <SelectItem value="scheduled">Scheduled</SelectItem>
-                  <SelectItem value="confirmed">Confirmed</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                  <DropdownMenuItem onSelect={() => setStatusFilter('all')}>All Statuses</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setStatusFilter('scheduled')}>Scheduled</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setStatusFilter('confirmed')}>Confirmed</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setStatusFilter('completed')}>Completed</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setStatusFilter('cancelled')}>Cancelled</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -138,7 +179,7 @@ export default function AppointmentsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {appointments.map((appt) => (
+              {filteredAppointments.length > 0 ? filteredAppointments.map((appt) => (
                 <TableRow key={appt.id}>
                   <TableCell>
                     <div className="font-medium">{appt.clientName}</div>
@@ -148,51 +189,60 @@ export default function AppointmentsPage() {
                   <TableCell>{getProfessionalName(appt.professionalId)}</TableCell>
                   <TableCell>{formatDateTime(appt.startTime)}</TableCell>
                   <TableCell>
-                    <Badge variant={statusBadgeVariant(appt.status)} className="flex items-center gap-1.5">
+                    <Badge variant={statusBadgeVariant(appt.status)} className="flex items-center gap-1.5 cursor-pointer">
                       {statusIcon(appt.status)}
                       {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem asChild>
-                          <Link
-                            href={`/admin/appointments/${appt.id}`}
-                            className="flex items-center w-full">
-                            <Eye className="mr-2 h-4 w-4" /> View Details
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem asChild>
-                          <Link
-                            href={`/admin/appointments/${appt.id}/edit`}
-                            className="flex items-center w-full">
-                            <Edit className="mr-2 h-4 w-4" /> Edit
-                          </Link>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
-                          <Trash2 className="mr-2 h-4 w-4" /> Cancel
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    <AlertDialog>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onSelect={() => handleStatusUpdate(appt.id, 'confirmed')}>
+                                <UserCheck className="mr-2 h-4 w-4" /> Mark as Confirmed
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onSelect={() => handleStatusUpdate(appt.id, 'completed')}>
+                                <CheckCircle className="mr-2 h-4 w-4" /> Mark as Completed
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <AlertDialogTrigger asChild>
+                                <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={(e) => e.preventDefault()}>
+                                    <Trash2 className="mr-2 h-4 w-4" /> Cancel Appointment
+                                </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <AlertDialogContent>
+                            <AlertDialogHeader>
+                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                This action will cancel the appointment for {appt.clientName}. This cannot be undone.
+                                </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                                <AlertDialogCancel>Back</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleCancelAppointment(appt.id)}>
+                                Continue
+                                </AlertDialogAction>
+                            </AlertDialogFooter>
+                        </AlertDialogContent>
+                    </AlertDialog>
                   </TableCell>
                 </TableRow>
-              ))}
+              )) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
+                    No appointments found with the current filters.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
-          {appointments.length === 0 && (
-            <div className="text-center py-10 text-muted-foreground">
-              No appointments found for your salon.
-            </div>
-          )}
         </CardContent>
       </Card>
     </>
   );
 }
-

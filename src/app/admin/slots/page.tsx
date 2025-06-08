@@ -10,7 +10,12 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { getProfessionalsBySalon } from '@/lib/firestoreService'; // Importando do Firestore
+import { getProfessionalsBySalon, 
+  getProfessionalAvailability, 
+  saveRecurringAvailability, 
+  saveDateOverrides 
+} from '@/lib/firestoreService';
+import { useToast } from "@/hooks/use-toast";
 import type { Professional } from '@/lib/types';
 import { CalendarIcon, Clock, PlusCircle, Trash2, Loader2, Users } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
@@ -29,10 +34,17 @@ export default function ManageSlotsPage() {
   const [salonProfessionals, setSalonProfessionals] = useState<Professional[]>([]);
   const [selectedProfessional, setSelectedProfessional] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast(); // Hook para notificações
+
+  const [isSavingRecurring, setIsSavingRecurring] = useState(false);
+  const [isSavingOverrides, setIsSavingOverrides] = useState(false);
 
   // O estado para disponibilidade e overrides permanece o mesmo por enquanto
-  const [recurringAvailability, setRecurringAvailability] = useState(
-    daysOfWeek.reduce((acc, day) => ({ ...acc, [day]: { isOpen: false, startTime: '09:00', endTime: '17:00' } }), {})
+  type RecurringDayAvailability = { isOpen: boolean; startTime: string; endTime: string };
+  type RecurringAvailability = { [day: string]: RecurringDayAvailability };
+
+  const [recurringAvailability, setRecurringAvailability] = useState<RecurringAvailability>(
+    daysOfWeek.reduce((acc, day) => ({ ...acc, [day]: { isOpen: false, startTime: '09:00', endTime: '17:00' } }), {} as RecurringAvailability)
   );
   const [specificOverrides, setSpecificOverrides] = useState<{ date: Date | undefined, startTime: string, endTime: string, type: 'available' | 'unavailable' }[]>([]);
   const [overrideDate, setOverrideDate] = useState<Date | undefined>();
@@ -69,6 +81,31 @@ export default function ManageSlotsPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, authLoading]); // A dependência de searchParams é intencionalmente omitida para evitar re-fetches
 
+  // Efeito para buscar a disponibilidade do profissional selecionado
+  useEffect(() => {
+    const fetchAvailability = async () => {
+      if (selectedProfessional) {
+        setIsLoading(true);
+        const availability = await getProfessionalAvailability(selectedProfessional);
+        if (availability) {
+          // Garante que todos os dias da semana estejam no estado
+          const initialRecurring = daysOfWeek.reduce((acc, day) => ({ 
+              ...acc, 
+              [day]: availability.recurringAvailability[day] || { isOpen: false, startTime: '09:00', endTime: '17:00' }
+          }), {});
+          setRecurringAvailability(initialRecurring);
+          setSpecificOverrides(availability.dateOverrides || []);
+        } else {
+           // Reseta para o padrão se não encontrar dados
+           setRecurringAvailability(daysOfWeek.reduce((acc, day) => ({ ...acc, [day]: { isOpen: false, startTime: '09:00', endTime: '17:00' } }), {}));
+           setSpecificOverrides([]);
+        }
+        setIsLoading(false);
+      }
+    };
+    fetchAvailability();
+  }, [selectedProfessional]);
+
   // Função para atualizar a URL quando o profissional for alterado
   const handleProfessionalChange = (professionalId: string) => {
     setSelectedProfessional(professionalId);
@@ -84,6 +121,42 @@ export default function ManageSlotsPage() {
   
   const handleRemoveOverride = (index: number) => {
     setSpecificOverrides(specificOverrides.filter((_, i) => i !== index));
+  };
+
+  // Função para lidar com mudanças na disponibilidade recorrente
+  const handleRecurringChange = (day: string, field: 'isOpen' | 'startTime' | 'endTime', value: string | boolean) => {
+    setRecurringAvailability(prev => ({
+      ...prev,
+      [day]: { ...prev[day as keyof typeof prev], [field]: value }
+    }));
+  };
+
+  // Função para salvar a disponibilidade recorrente
+  const handleSaveRecurring = async () => {
+    if (!selectedProfessional) return;
+    setIsSavingRecurring(true);
+    try {
+      await saveRecurringAvailability(selectedProfessional, recurringAvailability);
+      toast({ title: "Sucesso!", description: "Disponibilidade semanal salva." });
+    } catch (error) {
+      toast({ title: "Erro", description: "Não foi possível salvar a disponibilidade.", variant: "destructive" });
+    } finally {
+      setIsSavingRecurring(false);
+    }
+  };
+
+  // Função para salvar as exceções
+  const handleSaveOverrides = async () => {
+      if (!selectedProfessional) return;
+      setIsSavingOverrides(true);
+      try {
+          await saveDateOverrides(selectedProfessional, specificOverrides);
+          toast({ title: "Sucesso!", description: "Exceções de data salvas." });
+      } catch (error) {
+          toast({ title: "Erro", description: "Não foi possível salvar as exceções.", variant: "destructive" });
+      } finally {
+          setIsSavingOverrides(false);
+      }
   };
 
   if (authLoading || isLoading) {
@@ -151,31 +224,43 @@ export default function ManageSlotsPage() {
                       <AccordionContent className="space-y-4 pt-2">
                         <div className="flex items-center space-x-2">
                           <Checkbox 
-                            id={`isOpen-${day}`} 
+                            id={`isOpen-${day}`}
+                            checked={recurringAvailability[day as keyof typeof recurringAvailability].isOpen}
+                            onCheckedChange={(checked) => handleRecurringChange(day, 'isOpen', !!checked)}
+                            disabled={!selectedProfessional || isSavingRecurring}
                           />
                           <Label htmlFor={`isOpen-${day}`}>Open on {day}</Label>
                         </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label htmlFor={`startTime-${day}`}>Start Time</Label>
-                              <Input 
-                                type="time" 
-                                id={`startTime-${day}`} 
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor={`endTime-${day}`}>End Time</Label>
-                              <Input 
-                                type="time" 
-                                id={`endTime-${day}`} 
-                              />
-                            </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor={`startTime-${day}`}>Start Time</Label>
+                            <Input 
+                              type="time" 
+                              id={`startTime-${day}`}
+                              value={recurringAvailability[day as keyof typeof recurringAvailability].startTime}
+                              onChange={(e) => handleRecurringChange(day, 'startTime', e.target.value)}
+                              disabled={!recurringAvailability[day as keyof typeof recurringAvailability].isOpen || !selectedProfessional || isSavingRecurring}
+                            />
                           </div>
+                          <div>
+                            <Label htmlFor={`endTime-${day}`}>End Time</Label>
+                            <Input 
+                              type="time" 
+                              id={`endTime-${day}`}
+                              value={recurringAvailability[day as keyof typeof recurringAvailability].endTime}
+                              onChange={(e) => handleRecurringChange(day, 'endTime', e.target.value)}
+                              disabled={!recurringAvailability[day as keyof typeof recurringAvailability].isOpen || !selectedProfessional || isSavingRecurring}
+                            />
+                          </div>
+                        </div>
                       </AccordionContent>
                     </AccordionItem>
                   ))}
                 </Accordion>
-                <Button className="mt-6 w-full bg-primary hover:bg-primary/90">Save Recurring Availability</Button>
+                <Button onClick={handleSaveRecurring} disabled={isSavingRecurring || !selectedProfessional} className="mt-6 w-full bg-primary hover:bg-primary/90">
+                  {isSavingRecurring && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                  Save Recurring Availability
+                </Button>
               </CardContent>
             </Card>
 
@@ -265,7 +350,10 @@ export default function ManageSlotsPage() {
                 {specificOverrides.length === 0 && (
                     <p className="text-muted-foreground text-center py-4">No specific overrides added yet for this professional.</p>
                 )}
-                <Button className="mt-6 w-full bg-primary hover:bg-primary/90">Save All Overrides</Button>
+                <Button onClick={handleSaveOverrides} disabled={isSavingOverrides || !selectedProfessional} className="mt-6 w-full bg-primary hover:bg-primary/90">
+                  {isSavingOverrides && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                  Save All Overrides
+                </Button>
               </CardContent>
             </Card>
           </>
