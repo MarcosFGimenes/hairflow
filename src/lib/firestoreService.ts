@@ -1,7 +1,6 @@
-
 import { db } from '@/lib/firebase';
-import type { Salon } from '@/lib/types';
-import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, limit } from 'firebase/firestore';
+import type { Salon, Professional } from '@/lib/types';
+import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, limit, addDoc } from 'firebase/firestore';
 
 // Function to create a URL-friendly slug
 const generateSlug = (name: string): string => {
@@ -89,3 +88,40 @@ export const getSalonBySlug = async (slug: string): Promise<Salon | null> => {
   console.warn(`No salon found with slug: ${slug}`);
   return null;
 };
+
+// Creates a new professional document in Firestore.
+export const createProfessional = async (
+  salonId: string,
+  professionalData: Omit<Professional, 'id' | 'salonId'>
+): Promise<string> => {
+  const professionalsCollectionRef = collection(db, 'professionals');
+  const newProfessionalDoc = await addDoc(professionalsCollectionRef, {
+    ...professionalData,
+    salonId: salonId, // Ensure the professional is associated with the correct salon
+  });
+  console.log(`Professional created with ID: ${newProfessionalDoc.id} for salon ${salonId}`);
+  return newProfessionalDoc.id;
+};
+
+// Fetches professionals for a given salon ID.
+export const getProfessionalsBySalon = async (salonId: string): Promise<Professional[]> => {
+  if (!salonId) return [];
+  
+  const professionalsCollectionRef = collection(db, 'professionals');
+  const q = query(professionalsCollectionRef, where('salonId', '==', salonId));
+  
+  const querySnapshot = await getDocs(q);
+  if (querySnapshot.empty) {
+    console.log(`No professionals found for salon ID: ${salonId}`);
+    return [];
+  }
+  
+  const professionals: Professional[] = querySnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  } as Professional));
+  
+  return professionals;
+};
+
+

@@ -1,4 +1,3 @@
-
 "use client";
 
 import { Button } from '@/components/ui/button';
@@ -11,51 +10,70 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { placeholderProfessionals } from '@/lib/placeholder-data';
-import type { Professional } from '@/lib/types'; // Import Professional type
-import { CalendarIcon, Clock, PlusCircle, Trash2, Loader2, Users } from 'lucide-react'; // Added Loader2 and Users
-import React, { useState, useEffect } from 'react'; // Imported useState and useEffect
+import { getProfessionalsBySalon } from '@/lib/firestoreService'; // Importando do Firestore
+import type { Professional } from '@/lib/types';
+import { CalendarIcon, Clock, PlusCircle, Trash2, Loader2, Users } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useAuth } from '@/contexts/AuthContext';
+import { useSearchParams, useRouter } from 'next/navigation'; // Hooks para gerenciar URL params
 
 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
 export default function ManageSlotsPage() {
   const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [salonProfessionals, setSalonProfessionals] = useState<Professional[]>([]);
   const [selectedProfessional, setSelectedProfessional] = useState<string | undefined>();
   const [isLoading, setIsLoading] = useState(true);
 
-  // State for recurring availability (simplified for brevity)
+  // O estado para disponibilidade e overrides permanece o mesmo por enquanto
   const [recurringAvailability, setRecurringAvailability] = useState(
     daysOfWeek.reduce((acc, day) => ({ ...acc, [day]: { isOpen: false, startTime: '09:00', endTime: '17:00' } }), {})
   );
-  // State for specific date overrides
   const [specificOverrides, setSpecificOverrides] = useState<{ date: Date | undefined, startTime: string, endTime: string, type: 'available' | 'unavailable' }[]>([]);
   const [overrideDate, setOverrideDate] = useState<Date | undefined>();
   const [overrideStartTime, setOverrideStartTime] = useState('09:00');
   const [overrideEndTime, setOverrideEndTime] = useState('17:00');
   const [overrideType, setOverrideType] = useState<'available' | 'unavailable'>('available');
 
+  // Efeito para buscar profissionais e definir o padrão
   useEffect(() => {
-    if (!authLoading && user) {
-      const userSalonId = user.uid;
-      const filteredProfessionals = placeholderProfessionals.filter(prof => prof.salonId === userSalonId);
-      setSalonProfessionals(filteredProfessionals);
-      if (filteredProfessionals.length > 0 && !selectedProfessional) {
-        setSelectedProfessional(filteredProfessionals[0].id);
-      } else if (filteredProfessionals.length === 0) {
-        setSelectedProfessional(undefined);
-      }
-      setIsLoading(false);
-    } else if (!authLoading && !user) {
-      setSalonProfessionals([]);
-      setSelectedProfessional(undefined);
-      setIsLoading(false);
-    }
-  }, [user, authLoading, selectedProfessional]);
+    const fetchAndSetData = async () => {
+      if (user) {
+        setIsLoading(true);
+        const fetchedProfessionals = await getProfessionalsBySalon(user.uid);
+        setSalonProfessionals(fetchedProfessionals);
 
+        // Verifica se há um profissional na URL, senão define o primeiro da lista como padrão
+        const professionalFromUrl = searchParams.get('professional');
+        if (professionalFromUrl && fetchedProfessionals.some(p => p.id === professionalFromUrl)) {
+          setSelectedProfessional(professionalFromUrl);
+        } else if (fetchedProfessionals.length > 0) {
+          setSelectedProfessional(fetchedProfessionals[0].id);
+        }
+        
+        setIsLoading(false);
+      } else {
+        setSalonProfessionals([]);
+        setIsLoading(false);
+      }
+    };
+
+    if (!authLoading) {
+      fetchAndSetData();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, authLoading]); // A dependência de searchParams é intencionalmente omitida para evitar re-fetches
+
+  // Função para atualizar a URL quando o profissional for alterado
+  const handleProfessionalChange = (professionalId: string) => {
+    setSelectedProfessional(professionalId);
+    router.push(`/admin/slots?professional=${professionalId}`);
+  };
 
   const handleAddOverride = () => {
     if (overrideDate) {
@@ -98,7 +116,7 @@ export default function ManageSlotsPage() {
           </CardHeader>
           <CardContent>
             {salonProfessionals.length > 0 ? (
-              <Select value={selectedProfessional} onValueChange={setSelectedProfessional}>
+              <Select value={selectedProfessional} onValueChange={handleProfessionalChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select a professional" />
                 </SelectTrigger>
@@ -134,20 +152,15 @@ export default function ManageSlotsPage() {
                         <div className="flex items-center space-x-2">
                           <Checkbox 
                             id={`isOpen-${day}`} 
-                            // checked={recurringAvailability[day].isOpen} 
-                            // onCheckedChange={(checked) => handleRecurringChange(day, 'isOpen', checked)}
                           />
                           <Label htmlFor={`isOpen-${day}`}>Open on {day}</Label>
                         </div>
-                        {/* {recurringAvailability[day].isOpen && ( */}
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <Label htmlFor={`startTime-${day}`}>Start Time</Label>
                               <Input 
                                 type="time" 
                                 id={`startTime-${day}`} 
-                                // value={recurringAvailability[day].startTime} 
-                                // onChange={(e) => handleRecurringChange(day, 'startTime', e.target.value)}
                               />
                             </div>
                             <div>
@@ -155,12 +168,9 @@ export default function ManageSlotsPage() {
                               <Input 
                                 type="time" 
                                 id={`endTime-${day}`} 
-                                // value={recurringAvailability[day].endTime}
-                                // onChange={(e) => handleRecurringChange(day, 'endTime', e.target.value)}
                               />
                             </div>
                           </div>
-                        {/* )} */}
                       </AccordionContent>
                     </AccordionItem>
                   ))}

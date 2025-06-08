@@ -1,18 +1,16 @@
-
 "use client";
 
 import Link from 'next/link';
-import Image from 'next/image';
-import React, { useState, useEffect } from 'react'; // Added useState and useEffect
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { MoreHorizontal, UserPlus, Edit, Trash2, Loader2 } from 'lucide-react'; // Added Loader2
-import { placeholderProfessionals } from '@/lib/placeholder-data';
-import type { Professional } from '@/lib/types'; // Import Professional type
+import { MoreHorizontal, UserPlus, Edit, Trash2, Loader2 } from 'lucide-react';
+import { getProfessionalsBySalon } from '@/lib/firestoreService'; // Importar a nova função
+import type { Professional } from '@/lib/types';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { useAuth } from '@/contexts/AuthContext'; // Import useAuth
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function ProfessionalsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -20,17 +18,21 @@ export default function ProfessionalsPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!authLoading && user) {
-      // Filter placeholderProfessionals based on the logged-in user's salonId (user.uid)
-      // In a real app, you would fetch professionals from Firestore filtered by salonId
-      const userSalonId = user.uid; 
-      const filtered = placeholderProfessionals.filter(prof => prof.salonId === userSalonId);
-      setProfessionals(filtered);
-      setIsLoading(false);
-    } else if (!authLoading && !user) {
-      // No user, so no professionals to show, or redirect handled by AdminLayout
-      setProfessionals([]);
-      setIsLoading(false);
+    // Função assíncrona para buscar os profissionais
+    const fetchProfessionals = async () => {
+      if (user) {
+        setIsLoading(true);
+        const fetchedProfessionals = await getProfessionalsBySalon(user.uid);
+        setProfessionals(fetchedProfessionals);
+        setIsLoading(false);
+      } else {
+        setProfessionals([]);
+        setIsLoading(false);
+      }
+    };
+
+    if (!authLoading) {
+      fetchProfessionals();
     }
   }, [user, authLoading]);
 
@@ -83,7 +85,7 @@ export default function ProfessionalsPage() {
             <CardHeader className="flex flex-row items-start justify-between">
               <div className="flex items-center gap-4">
                 <Avatar className="h-16 w-16 border-2 border-primary">
-                  <AvatarImage src={prof.imageUrl || `https://placehold.co/100x100.png`} alt={prof.name} data-ai-hint="person beauty" />
+                  <AvatarImage src={prof.imageUrl || `https://placehold.co/100x100.png`} alt={prof.name} />
                   <AvatarFallback>{prof.name.substring(0, 2).toUpperCase()}</AvatarFallback>
                 </Avatar>
                 <div>
@@ -98,12 +100,8 @@ export default function ProfessionalsPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem asChild>
-                    <Link
-                      href={`/admin/professionals/${prof.id}/edit`}
-                      className="flex items-center w-full">
+                  <DropdownMenuItem>
                       <Edit className="mr-2 h-4 w-4" /> Edit Profile
-                    </Link>
                   </DropdownMenuItem>
                   <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
                     <Trash2 className="mr-2 h-4 w-4" /> Remove
@@ -111,11 +109,6 @@ export default function ProfessionalsPage() {
                 </DropdownMenuContent>
               </DropdownMenu>
             </CardHeader>
-            <CardContent className="flex-grow">
-              {/* Could add more details here if needed, like contact info or a short bio */}
-              <p className="text-sm text-muted-foreground">Manages own schedule: Yes</p>
-              <p className="text-sm text-muted-foreground">Services offered: Haircuts, Fades, Beard Trims</p>
-            </CardContent>
             <CardFooter>
                 <Link href={`/admin/slots?professional=${prof.id}`} className="w-full">
                     <Button variant="outline" className="w-full">Manage Availability</Button>

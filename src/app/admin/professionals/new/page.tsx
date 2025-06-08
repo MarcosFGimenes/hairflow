@@ -1,51 +1,72 @@
-
 "use client";
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { UserPlus, Save, UploadCloud } from 'lucide-react';
+import { UserPlus, Save, UploadCloud, Loader2 } from 'lucide-react';
 import Image from 'next/image';
+import { useAuth } from '@/contexts/AuthContext'; // Importar useAuth
+import { createProfessional } from '@/lib/firestoreService'; // Importar a nova função
+import { useToast } from "@/hooks/use-toast"; // Para notificações melhores
 
 export default function NewProfessionalPage() {
+  const router = useRouter();
+  const { user } = useAuth(); // Obter o usuário logado
+  const { toast } = useToast();
   const [name, setName] = useState("");
   const [specialty, setSpecialty] = useState("");
-  const [email, setEmail] = useState(""); // Optional
-  const [phone, setPhone] = useState(""); // Optional
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-
+  // A função handleImageUpload permanece a mesma
   const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
-      setImageFile(file);
+      // setImageFile(file); // A lógica de upload de arquivo real seria necessária aqui
       setImageUrl(URL.createObjectURL(file));
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name) {
-      alert("Professional's name is required.");
+    if (!user) {
+      toast({ title: "Erro de Autenticação", description: "Você não está logado.", variant: "destructive" });
       return;
     }
-    const professionalData = {
-      name,
-      specialty,
-      email,
-      phone,
-      imageUrl: imageFile ? `path/to/uploaded/${imageFile.name}` : null, // Placeholder for actual upload path
-    };
-    console.log("New professional data:", professionalData);
-    alert("New professional added successfully (This is a demo).");
-    // TODO: Implement actual save logic (including image upload) and redirect
-    // router.push('/admin/professionals');
+    if (!name) {
+      toast({ title: "Campo Obrigatório", description: "O nome do profissional é obrigatório.", variant: "destructive" });
+      return;
+    }
+
+    setIsSaving(true);
+    
+    try {
+      const professionalData = {
+        name,
+        specialty,
+        // Em um app real, você faria o upload da imagem para o Firebase Storage aqui
+        // e usaria a URL retornada. Por enquanto, usaremos o placeholder.
+        imageUrl: imageUrl || 'https://placehold.co/100x100.png',
+      };
+
+      await createProfessional(user.uid, professionalData);
+      
+      toast({ title: "Sucesso!", description: `${name} foi adicionado(a) à sua equipe.` });
+      router.push('/admin/professionals');
+
+    } catch (error) {
+      console.error("Erro ao adicionar profissional:", error);
+      toast({ title: "Erro", description: "Não foi possível adicionar o profissional. Tente novamente.", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -89,37 +110,32 @@ export default function NewProfessionalPage() {
 
             <div>
               <Label htmlFor="prof-name">Full Name *</Label>
-              <Input id="prof-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., John Doe" required />
+              <Input id="prof-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., John Doe" required disabled={isSaving}/>
             </div>
 
             <div>
               <Label htmlFor="prof-specialty">Specialty / Role</Label>
-              <Input id="prof-specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="e.g., Senior Stylist, Color Expert" />
+              <Input id="prof-specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="e.g., Senior Stylist, Color Expert" disabled={isSaving}/>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <Label htmlFor="prof-email">Email Address (Optional)</Label>
-                <Input id="prof-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john.doe@example.com" />
+                <Input id="prof-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john.doe@example.com" disabled={isSaving}/>
               </div>
               <div>
                 <Label htmlFor="prof-phone">Phone Number (Optional)</Label>
-                <Input id="prof-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" />
+                <Input id="prof-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" disabled={isSaving}/>
               </div>
             </div>
             
-            {/* Could add fields for bio, services offered by this professional, etc. */}
-            {/* <div>
-              <Label htmlFor="prof-bio">Short Bio (Optional)</Label>
-              <Textarea id="prof-bio" placeholder="A few words about the professional..." rows={3} />
-            </div> */}
-            
             <div className="flex justify-end gap-3 pt-6 border-t">
               <Link href="/admin/professionals">
-                <Button variant="outline" type="button">Cancel</Button>
+                <Button variant="outline" type="button" disabled={isSaving}>Cancel</Button>
               </Link>
-              <Button type="submit" className="bg-primary hover:bg-primary/90">
-                <Save className="mr-2 h-4 w-4" /> Save Professional
+              <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSaving}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                {isSaving ? 'Saving...' : 'Save Professional'}
               </Button>
             </div>
           </form>
@@ -128,4 +144,3 @@ export default function NewProfessionalPage() {
     </>
   );
 }
-

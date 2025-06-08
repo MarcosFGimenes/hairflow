@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { getProfessionalsBySalon } from '@/lib/firestoreService';
 import { useParams, useRouter } from 'next/navigation';
 import { GlobalHeader } from '@/components/shared/GlobalHeader';
 import { GlobalFooter } from '@/components/shared/GlobalFooter';
@@ -55,13 +56,16 @@ export default function SalonAppointmentPage() {
 
   useEffect(() => {
     if (salonSlug) {
-      const fetchSalon = async () => {
+      const fetchSalonAndProfessionals = async () => {
         setIsLoadingSalon(true);
         const fetchedSalon = await getSalonBySlug(salonSlug);
         if (fetchedSalon) {
           setSalon(fetchedSalon);
-          const salonProfessionals = placeholderProfessionals.filter(p => p.salonId === fetchedSalon.id || p.salonId === 'salon1');
+
+          // Busca os profissionais do Firestore em vez de usar os dados de exemplo
+          const salonProfessionals = await getProfessionalsBySalon(fetchedSalon.id);
           setProfessionals(salonProfessionals);
+
           if (salonProfessionals.length > 0) {
             setSelectedProfessionalId(salonProfessionals[0].id);
           }
@@ -70,7 +74,7 @@ export default function SalonAppointmentPage() {
         }
         setIsLoadingSalon(false);
       };
-      fetchSalon();
+      fetchSalonAndProfessionals();
     }
   }, [salonSlug, router, toast]);
 
