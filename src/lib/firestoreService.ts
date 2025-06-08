@@ -1,8 +1,7 @@
 import { db } from '@/lib/firebase';
-import type { Salon, Professional } from '@/lib/types';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, limit, addDoc, orderBy, deleteDoc } from 'firebase/firestore';
 import { getDay, format } from 'date-fns';
-import type { Appointment, TimeSlot } from '@/lib/types';
+import type { Appointment, TimeSlot, Salon, Professional } from '@/lib/types';
 
 // Function to create a URL-friendly slug
 const generateSlug = (name: string): string => {
@@ -331,6 +330,25 @@ export const cancelAppointment = async (appointmentId: string): Promise<void> =>
 export const deleteAppointment = async (appointmentId: string): Promise<void> => {
   const appointmentRef = doc(db, 'appointments', appointmentId);
   await deleteDoc(appointmentRef);
+};
+
+// Busca todos os salões cadastrados no Firestore
+export const getAllSalons = async (): Promise<Salon[]> => {
+  const salonsCollectionRef = collection(db, 'salons');
+  const q = query(salonsCollectionRef); // Query simples para pegar todos
+  
+  const querySnapshot = await getDocs(q);
+  if (querySnapshot.empty) {
+    console.log("No salons found in the database.");
+    return [];
+  }
+  
+  const salons: Salon[] = querySnapshot.docs.map(doc => ({
+    id: doc.id,
+    ...doc.data()
+  } as Salon));
+  
+  return salons;
 };
 
 

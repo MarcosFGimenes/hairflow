@@ -1,3 +1,4 @@
+// src/app/appointments/page.tsx
 
 "use client";
 
@@ -8,30 +9,62 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useState } from 'react';
-import { Search } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { placeholderSalons } from '@/lib/placeholder-data'; // For listing example salons
+import { getAllSalons } from '@/lib/firestoreService'; // Importa a nova função
+import type { Salon } from '@/lib/types';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AppointmentsLandingPage() {
   const router = useRouter();
+  const { toast } = useToast();
+  
+  const [allSalons, setAllSalons] = useState<Salon[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSearch = (e: React.FormEvent) => {
+  // Busca os salões do Firestore ao carregar a página
+  useEffect(() => {
+    const fetchSalons = async () => {
+      setIsLoading(true);
+      try {
+        const salons = await getAllSalons();
+        setAllSalons(salons);
+      } catch (error) {
+        console.error("Failed to fetch salons:", error);
+        toast({
+          title: "Error",
+          description: "Could not load the list of salons. Please try again later.",
+          variant: "destructive",
+        });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchSalons();
+  }, [toast]);
+  
+  // Filtra os salões com base na busca do usuário
+  const filteredSalons = useMemo(() => {
+    if (!searchQuery) return allSalons;
+    return allSalons.filter(salon =>
+      salon.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      salon.address?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [searchQuery, allSalons]);
+
+
+  // A função de busca agora só precisa do slug, não precisa mais pesquisar na lista
+  const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      // For now, let's assume searchQuery is a salon slug
-      // In a real app, this would search for salons and then redirect
-      // or show a list of matching salons.
-      // Here, we'll try to find a direct match with placeholder salon slugs.
-      const matchedSalon = placeholderSalons.find(s => s.slug.toLowerCase() === searchQuery.trim().toLowerCase() || s.name.toLowerCase().includes(searchQuery.trim().toLowerCase()));
-      if (matchedSalon) {
-        router.push(`/appointments/${matchedSalon.slug}`);
-      } else {
-        alert("Salon not found. Please try a different name or check our list.");
-      }
+        // A lista de salões já está sendo filtrada em tempo real,
+        // então o botão de busca pode ser usado para uma lógica mais avançada no futuro,
+        // como buscar por geolocalização. Por enquanto, a lista se atualiza ao digitar.
+        toast({ title: "Search", description: `Displaying salons matching "${searchQuery}"`});
     } else {
-        alert("Please enter a salon name or location to search.")
+        toast({ title: "Info", description: "Showing all available salons."});
     }
   };
 
@@ -49,13 +82,13 @@ export default function AppointmentsLandingPage() {
         <Card className="max-w-2xl mx-auto mb-12 shadow-xl">
           <CardHeader>
             <CardTitle className="font-headline text-2xl text-center">Search for a Salon</CardTitle>
-            <CardDescription className="text-center">Enter salon name or your city to find available bookings.</CardDescription>
+            <CardDescription className="text-center">Enter a salon name or address to filter the list below.</CardDescription>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSearch} className="flex gap-2">
+            <form onSubmit={handleSearchSubmit} className="flex gap-2">
               <Input 
                 type="text" 
-                placeholder="Salon name or city (e.g., Cool Cuts or Anytown)" 
+                placeholder="Salon name or address..." 
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="flex-grow"
@@ -68,35 +101,42 @@ export default function AppointmentsLandingPage() {
         </Card>
 
         <section>
-            <h2 className="text-3xl font-bold font-headline mb-8 text-center text-foreground">Or Browse Our Featured Salons</h2>
-            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-                {placeholderSalons.map(salon => (
-                    <Card key={salon.id} className="overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
-                        <div className="relative h-48 w-full">
-                            <Image 
-                                src={`https://placehold.co/400x240.png`} // Generic placeholder
-                                alt={`${salon.name} exterior`} 
-                                layout="fill" 
-                                objectFit="cover"
-                                data-ai-hint="salon building"
-                            />
-                        </div>
-                        <CardHeader>
-                            <CardTitle className="font-headline text-xl">{salon.name}</CardTitle>
-                            <CardDescription>{salon.address}</CardDescription>
-                        </CardHeader>
-                        <CardFooter>
-                            <Link href={`/appointments/${salon.slug}`}>
-                                <Button className="w-full bg-primary hover:bg-primary/90">View Availability</Button>
-                            </Link>
-                        </CardFooter>
-                    </Card>
-                ))}
-            </div>
+            <h2 className="text-3xl font-bold font-headline mb-8 text-center text-foreground">Our Salons</h2>
+            {isLoading ? (
+                <div className="flex justify-center items-center py-10">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                </div>
+            ) : (
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+                    {filteredSalons.length > 0 ? filteredSalons.map(salon => (
+                        <Card key={salon.id} className="overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
+                            <div className="relative h-48 w-full">
+                                <Image 
+                                    src={`https://placehold.co/400x240.png`}
+                                    alt={`${salon.name} exterior`} 
+                                    layout="fill" 
+                                    objectFit="cover"
+                                    data-ai-hint="salon building"
+                                />
+                            </div>
+                            <CardHeader>
+                                <CardTitle className="font-headline text-xl">{salon.name}</CardTitle>
+                                <CardDescription>{salon.address || 'Address not provided'}</CardDescription>
+                            </CardHeader>
+                            <CardFooter>
+                                <Link href={`/appointments/${salon.slug}`} passHref>
+                                    <Button className="w-full bg-primary hover:bg-primary/90">View Availability</Button>
+                                </Link>
+                            </CardFooter>
+                        </Card>
+                    )) : (
+                        <p className="col-span-full text-center text-muted-foreground">No salons found matching your search.</p>
+                    )}
+                </div>
+            )}
         </section>
       </main>
       <GlobalFooter />
     </>
   );
 }
-
