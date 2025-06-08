@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -14,12 +13,13 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { getSalonBySlug } from '@/lib/firestoreService'; // Import service
-import { placeholderProfessionals, placeholderTimeSlots, placeholderAppointments } from '@/lib/placeholder-data'; // Professionals and slots still placeholder for now
+import { getSalonBySlug } from '@/lib/firestoreService';
+import { placeholderProfessionals, placeholderTimeSlots, placeholderAppointments } from '@/lib/placeholder-data';
 import type { Salon, Professional, TimeSlot, Appointment } from '@/lib/types';
 import { User, Phone, Briefcase, Calendar as CalendarIconLucide, Clock, CheckCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import Image from 'next/image';
+import { useToast } from "@/hooks/use-toast";
 
 const steps = [
   { id: 1, name: "Select Date & Professional" },
@@ -31,12 +31,13 @@ const steps = [
 export default function SalonAppointmentPage() {
   const params = useParams();
   const router = useRouter();
+  const { toast } = useToast();
   const salonSlug = params.salonname as string;
 
   const [currentStep, setCurrentStep] = useState(1);
   const [salon, setSalon] = useState<Salon | null>(null);
   const [isLoadingSalon, setIsLoadingSalon] = useState(true);
-  const [professionals, setProfessionals] = useState<Professional[]>([]); // Will be fetched later
+  const [professionals, setProfessionals] = useState<Professional[]>([]);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedProfessionalId, setSelectedProfessionalId] = useState<string | undefined>();
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
@@ -48,12 +49,9 @@ export default function SalonAppointmentPage() {
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   
   const [selectedService, setSelectedService] = useState<string>("Standard Haircut"); 
-  const services = ["Standard Haircut", "Beard Trim", "Hair Wash & Style", "Kids Cut"]; // Placeholder
+  const services = ["Standard Haircut", "Beard Trim", "Hair Wash & Style", "Kids Cut"];
 
   const currentProfessional = useMemo(() => professionals.find(p => p.id === selectedProfessionalId), [professionals, selectedProfessionalId]);
-    // Helper for toast, can be moved to a utils file
-    import { useToast } from "@/hooks/use-toast"; 
-    const { toast } = useToast();
 
   useEffect(() => {
     if (salonSlug) {
@@ -62,32 +60,26 @@ export default function SalonAppointmentPage() {
         const fetchedSalon = await getSalonBySlug(salonSlug);
         if (fetchedSalon) {
           setSalon(fetchedSalon);
-          // TODO: Fetch professionals for this salon
-          // For now, using placeholder professionals filtered by a known ID if available
-          // This part needs to be replaced with actual professional fetching for fetchedSalon.id
-          const salonProfessionals = placeholderProfessionals.filter(p => p.salonId === fetchedSalon.id || p.salonId === 'salon1'); // Temporary fallback
+          const salonProfessionals = placeholderProfessionals.filter(p => p.salonId === fetchedSalon.id || p.salonId === 'salon1');
           setProfessionals(salonProfessionals);
           if (salonProfessionals.length > 0) {
             setSelectedProfessionalId(salonProfessionals[0].id);
           }
         } else {
-          // Handle salon not found
           toast({ title: "Salon Not Found", description: "This salon does not exist or the URL is incorrect.", variant: "destructive"});
-          // router.push('/404'); // Or a dedicated not found page
         }
         setIsLoadingSalon(false);
       };
       fetchSalon();
     }
-  }, [salonSlug, router]);
+  }, [salonSlug, router, toast]);
 
   useEffect(() => {
     if (selectedDate && selectedProfessionalId && salon) {
       setIsLoadingSlots(true);
-      // Simulate API call for slots - this needs to be real data fetching
       setTimeout(() => {
         const slotsForDayAndProf = placeholderTimeSlots.filter(slot =>
-          slot.salonId === salon.id && // This might need adjustment if placeholderTimeSlots don't match dynamic salon.id
+          slot.salonId === salon.id &&
           slot.professionalId === selectedProfessionalId &&
           new Date(slot.startTime).toDateString() === selectedDate.toDateString() &&
           !slot.isBooked 
@@ -118,12 +110,10 @@ export default function SalonAppointmentPage() {
   const handlePrevStep = () => { if (currentStep > 1) setCurrentStep(currentStep -1);};
 
   const handleSubmitBooking = () => {
-    // TODO: Implement actual appointment saving to Firestore
-    if (!salon || !selectedProfessionalId || !selectedSlot || !clientName || !clientPhone || !selectedService) return;
-    if (!currentProfessional) return;
+    if (!salon || !selectedProfessionalId || !selectedSlot || !clientName || !clientPhone || !selectedService || !currentProfessional) return;
 
     const newAppointment: Appointment = {
-      id: `appt-${Date.now()}`, // Firestore will generate ID
+      id: `appt-${Date.now()}`,
       salonId: salon.id,
       professionalId: selectedProfessionalId,
       clientName,
@@ -131,9 +121,9 @@ export default function SalonAppointmentPage() {
       serviceName: selectedService,
       startTime: selectedSlot.startTime,
       endTime: selectedSlot.endTime,
-      status: 'scheduled', // Initially scheduled, admin can confirm
+      status: 'scheduled',
     };
-    setConfirmedAppointment(newAppointment); // For dialog
+    setConfirmedAppointment(newAppointment);
     setIsConfirming(true);
     setCurrentStep(4); 
     console.log("Booking submitted (visual only):", newAppointment);
@@ -166,7 +156,6 @@ export default function SalonAppointmentPage() {
       </>
     );
   }
-
 
   return (
     <>
@@ -290,7 +279,7 @@ export default function SalonAppointmentPage() {
             )}
             
             {currentStep === 4 && confirmedAppointment && salon && currentProfessional && (
-               (<div className="text-center py-10">
+               <div className="text-center py-10">
                  <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
                  <h2 className="text-3xl font-bold font-headline text-primary">Booking Submitted! (Demo)</h2>
                  <p className="text-muted-foreground mt-2">Your appointment request is sent. You will receive confirmation once approved.</p>
@@ -298,7 +287,7 @@ export default function SalonAppointmentPage() {
                    Check the confirmation pop-up for WhatsApp sharing options (if applicable).
                  </p>
                  <Button onClick={() => router.push('/')} className="mt-8">Back to Homepage</Button>
-               </div>)
+               </div>
             )}
 
             {currentStep < 4 && (
@@ -314,7 +303,6 @@ export default function SalonAppointmentPage() {
         </Card>
       </main>
       <GlobalFooter />
-      {/* Confirmation dialog should only show for actual confirmed bookings from Firestore in a real scenario */}
       {isConfirming && confirmedAppointment && salon && currentProfessional && (
         <ConfirmationDialog
           isOpen={isConfirming}
