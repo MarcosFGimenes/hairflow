@@ -5,7 +5,7 @@ export function GlobalFooter() {
       <div className="container mx-auto px-4 text-center text-muted-foreground">
         <p>&copy; {currentYear} Hairflow. All rights reserved.</p>
         <p className="text-sm mt-1">
-          Crafted with <span className="text-accent">&hearts;</span> by Your Team
+          Beyond Systems <span className="text-accent">&hearts;</span> Marcos Gimenes.
         </p>
       </div>
     </footer>
