@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Logo } from '@/components/shared/Logo';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -19,14 +20,17 @@ import {
 } from "@/components/ui/form";
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
-import { createSalon } from '@/lib/firestoreService'; // Import createSalon
+import { createSalon } from '@/lib/firestoreService';
 import { useRouter } from 'next/navigation';
 import { useToast } from "@/hooks/use-toast";
 import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 const signupSchema = z.object({
-  salonName: z.string().min(2, { message: "Salon name is too short." }),
+  salonName: z.string().min(2, { message: "Salon name must be at least 3 characters." }),
+  contactNumber: z.string().min(10, { message: "Contact number must be at least 10 digits." }),
+  address: z.string().optional(),
+  description: z.string().max(500, "Description can be up to 500 characters.").optional(),
   email: z.string().email({ message: "Invalid email address." }),
   password: z.string().min(6, { message: "Password must be at least 6 characters." }),
   confirmPassword: z.string(),
@@ -46,6 +50,9 @@ export default function SignupPage() {
     resolver: zodResolver(signupSchema),
     defaultValues: {
       salonName: "",
+      contactNumber: "",
+      address: "",
+      description: "",
       email: "",
       password: "",
       confirmPassword: "",
@@ -59,8 +66,14 @@ export default function SignupPage() {
       const user = userCredential.user;
       
       if (user) {
-        // After user is created in Auth, create the salon document in Firestore
-        await createSalon(user.uid, data.salonName, user.email || data.email); // Pass user.email or form email
+        await createSalon(
+          user.uid, 
+          data.salonName, 
+          user.email || data.email,
+          data.contactNumber,
+          data.address,
+          data.description
+        );
         toast({ title: "Signup Successful", description: "Salon created. Redirecting to dashboard..." });
         router.push("/admin"); 
       } else {
@@ -104,9 +117,49 @@ export default function SignupPage() {
                 name="salonName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Salon Name</FormLabel>
+                    <FormLabel>Salon Name *</FormLabel>
                     <FormControl>
                       <Input placeholder="e.g., Cool Cuts Barbershop" {...field} disabled={isLoading}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="contactNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contact Phone Number *</FormLabel>
+                    <FormControl>
+                      <Input type="tel" placeholder="(555) 123-4567" {...field} disabled={isLoading}/>
+                    </FormControl>
+                    <FormDescription>Used for WhatsApp booking confirmations and client contact.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Salon Address (Optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="123 Main St, Anytown, USA" {...field} disabled={isLoading}/>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Salon Description (Optional)</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Tell clients a bit about your salon..." {...field} rows={3} disabled={isLoading}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -117,7 +170,7 @@ export default function SignupPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email Address</FormLabel>
+                    <FormLabel>Login Email Address *</FormLabel>
                     <FormControl>
                       <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading}/>
                     </FormControl>
@@ -130,7 +183,7 @@ export default function SignupPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>Password *</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} disabled={isLoading}/>
                     </FormControl>
@@ -143,7 +196,7 @@ export default function SignupPage() {
                 name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
+                    <FormLabel>Confirm Password *</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} disabled={isLoading}/>
                     </FormControl>

@@ -19,8 +19,10 @@ const generateSlug = (name: string): string => {
 export const createSalon = async (
   adminUserId: string,
   salonName: string,
-  email: string,
-  contactNumber: string = "" // Default to empty string if not provided
+  email: string, // This is the login email for the admin user
+  contactNumber: string,
+  address?: string,
+  description?: string
 ): Promise<string> => {
   const salonSlug = generateSlug(salonName);
   const salonRef = doc(db, 'salons', adminUserId); // Use adminUserId as salon document ID
@@ -29,13 +31,13 @@ export const createSalon = async (
     adminUserId,
     name: salonName,
     slug: salonSlug,
-    email: email,
-    contactNumber: contactNumber, // Make sure this is provided or handled
-    address: "", // Initialize with empty address
-    description: "", // Initialize with empty description
+    email: email, // This should be the contact email for the salon, could be same as admin's login email or different
+    contactNumber: contactNumber,
+    address: address || "", 
+    description: description || "", 
   };
   await setDoc(salonRef, newSalon);
-  console.log(`Salon created for user ${adminUserId} with slug ${salonSlug}`);
+  console.log(`Salon created for user ${adminUserId} with slug ${salonSlug} and details:`, newSalon);
   return salonSlug; // Or return the full salon object if needed
 };
 
@@ -57,9 +59,17 @@ export const updateSalonSettings = async (
   data: Partial<Omit<Salon, 'id' | 'adminUserId'>> // Data to update
 ): Promise<void> => {
   const salonRef = doc(db, 'salons', adminUserId);
-  // Ensure slug is regenerated if salonName changes
+  
+  const currentSalonSnap = await getDoc(salonRef);
+  if (!currentSalonSnap.exists()) {
+    console.error(`Salon with ID ${adminUserId} not found for update.`);
+    throw new Error("Salon not found for update.");
+  }
+  const currentSalonData = currentSalonSnap.data() as Salon;
+
   const updateData = { ...data };
-  if (data.name && data.name !== (await getDoc(salonRef)).data()?.name) {
+  // Ensure slug is regenerated if salonName changes and is different from current
+  if (data.name && data.name !== currentSalonData.name) {
     updateData.slug = generateSlug(data.name);
   }
   await updateDoc(salonRef, updateData);
