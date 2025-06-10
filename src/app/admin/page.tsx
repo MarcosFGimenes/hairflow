@@ -7,58 +7,68 @@ import Link from 'next/link';
 import { CalendarDays, Clock, Users, DollarSign, PlusCircle, LayoutGrid } from 'lucide-react'; // NEW: Added LayoutGrid icon
 import { PageHeader } from '@/components/shared/PageHeader';
 import { useAuth } from '@/contexts/AuthContext'; // NEW: Import useAuth
-import { getAppointmentsForReporting, getProfessionalsBySalon } from '@/lib/firestoreService'; // NEW: Import getAppointmentsForReporting, getProfessionalsBySalon
+import { getAppointmentsBySalon, getAppointmentsForReporting, getProfessionalsBySalon } from '@/lib/firestoreService'; // NEW: Import getAppointmentsForReporting, getProfessionalsBySalon
 import { useState, useEffect, useMemo } from 'react'; // NEW: Import useState, useEffect, useMemo
 import { Loader2 } from 'lucide-react'; // NEW: Import Loader2 for loading state
+import { startOfDay, format } from 'date-fns'; // Import startOfDay and format
 
 
 export default function AdminDashboardPage() {
-  const { user, loading: authLoading } = useAuth(); //
-  const [isLoadingData, setIsLoadingData] = useState(true); // NEW: Loading state for data
-  const [upcomingAppointments, setUpcomingAppointments] = useState(0); //
-  const [totalProfessionals, setTotalProfessionals] = useState(0); //
-  const [dailyRevenue, setDailyRevenue] = useState(0); //
-  const [weeklyRevenue, setWeeklyRevenue] = useState(0); //
-  const [monthlyRevenue, setMonthlyRevenue] = useState(0); //
+  const { user, loading: authLoading } = useAuth();
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  const [upcomingAppointments, setUpcomingAppointments] = useState(0);
+  const [totalProfessionals, setTotalProfessionals] = useState(0);
+  const [dailyRevenue, setDailyRevenue] = useState(0);
+  const [weeklyRevenue, setWeeklyRevenue] = useState(0);
+  const [monthlyRevenue, setMonthlyRevenue] = useState(0);
+  const [availableSlotsToday, setAvailableSlotsToday] = useState(0); // Assuming this will be calculated or fetched
+  const [allAppointments, setAllAppointments] = useState<any[]>([]); // Store all appointments for recent activity
 
   useEffect(() => {
     const fetchData = async () => {
-      if (user) { //
+      if (user) {
         setIsLoadingData(true);
-        // Fetch upcoming appointments
-        const allAppointments = await getAppointmentsForReporting(user.uid, 'daily'); //
-        // Filter future appointments
-        const futureAppointments = allAppointments.filter(appt => appt.startTime.getTime() > new Date().getTime()); //
-        setUpcomingAppointments(futureAppointments.length); //
+        const salonId = user.uid; // Your salon's ID is the user's UID
+
+        // Fetch all appointments first to be used for multiple cards
+        const fetchedAllAppointments = await getAppointmentsBySalon(salonId);
+        setAllAppointments(fetchedAllAppointments);
+
+        // Calculate upcoming appointments
+        const startOfToday = startOfDay(new Date()).getTime();
+        const futureAppointments = fetchedAllAppointments.filter((appt: any) => appt.startTime.getTime() >= startOfToday);
+        setUpcomingAppointments(futureAppointments.length);
 
         // Fetch professionals
-        const professionalsList = await getProfessionalsBySalon(user.uid); //
-        setTotalProfessionals(professionalsList.length); //
+        const professionalsList = await getProfessionalsBySalon(salonId);
+        setTotalProfessionals(professionalsList.length);
 
-        // Fetch revenue data
-        const completedDailyAppointments = await getAppointmentsForReporting(user.uid, 'daily'); //
-        const completedWeeklyAppointments = await getAppointmentsForReporting(user.uid, 'weekly'); //
-        const completedMonthlyAppointments = await getAppointmentsForReporting(user.uid, 'monthly'); //
+        // Fetch revenue data (only for 'completed' appointments)
+        const completedDailyAppointments = await getAppointmentsForReporting(salonId, 'daily');
+        const completedWeeklyAppointments = await getAppointmentsForReporting(salonId, 'weekly');
+        const completedMonthlyAppointments = await getAppointmentsForReporting(salonId, 'monthly');
 
-        const sumRevenue = (appointments: any[]) => appointments.reduce((sum, appt) => sum + (appt.price || 0), 0); //
+        const sumRevenue = (appointments: any[]) => appointments.reduce((sum, appt) => sum + (appt.price || 0), 0);
 
-        setDailyRevenue(sumRevenue(completedDailyAppointments)); //
-        setWeeklyRevenue(sumRevenue(completedWeeklyAppointments)); //
-        setMonthlyRevenue(sumRevenue(completedMonthlyAppointments)); //
+        setDailyRevenue(sumRevenue(completedDailyAppointments));
+        setWeeklyRevenue(sumRevenue(completedWeeklyAppointments));
+        setMonthlyRevenue(sumRevenue(completedMonthlyAppointments));
+
+        // TODO: Implement actual calculation for available slots today
+        // This would require fetching availability for each professional for today
+        // and subtracting booked slots from it. For now, it remains a placeholder.
+        setAvailableSlotsToday(0); // Placeholder
 
         setIsLoadingData(false);
       }
     };
 
-    if (!authLoading) { //
+    if (!authLoading) {
       fetchData();
     }
-  }, [user, authLoading]); //
+  }, [user, authLoading]);
 
-  // Mock data for available slots today (this still needs real implementation)
-  const availableSlotsToday = 12;
-
-  if (authLoading || isLoadingData) { //
+  if (authLoading || isLoadingData) {
     return (
       <>
         <PageHeader
@@ -89,7 +99,7 @@ export default function AdminDashboardPage() {
           </Link>
         }
       />
-      
+
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -98,7 +108,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-bold font-headline">{upcomingAppointments}</div>
-            <p className="text-xs text-muted-foreground">Próximos 7 dias</p>
+            <p className="text-xs text-muted-foreground">Próximos agendamentos</p>
           </CardContent>
         </Card>
 
@@ -123,7 +133,7 @@ export default function AdminDashboardPage() {
             <p className="text-xs text-muted-foreground">Membros da equipe ativos</p>
           </CardContent>
         </Card>
-        
+
         <Card className="shadow-lg hover:shadow-xl transition-shadow">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Faturamento Total (Est.)</CardTitle>
@@ -156,7 +166,7 @@ export default function AdminDashboardPage() {
             <Link href="/admin/professionals">
               <Button variant="outline" className="w-full justify-start"><Users className="mr-2 h-4 w-4" /> Adicionar/Editar Profissionais</Button>
             </Link>
-            {/* NEW: Link to manage services */}
+            {/* Link to manage services */}
             <Link href="/admin/services">
               <Button variant="outline" className="w-full justify-start"><LayoutGrid className="mr-2 h-4 w-4" /> Gerenciar Serviços</Button>
             </Link>
@@ -172,11 +182,38 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent>
             <ul className="space-y-3">
-              <li className="text-sm text-muted-foreground">Nova reserva: João S. para Corte de Cabelo - Amanhã às 14h.</li>
-              <li className="text-sm text-muted-foreground">Disponibilidade atualizada para Joana D.</li>
-              <li className="text-sm text-muted-foreground">Reserva cancelada: Alex P. - Hoje às 10h.</li>
+              {allAppointments.length > 0 ? (
+                allAppointments.slice(0, 3).map((appt: any) => (
+                  <li key={appt.id} className="text-sm text-muted-foreground">
+                    {appt.status === 'scheduled' && (
+                      <>
+                        Nova reserva: <span className="font-medium">{appt.clientName}</span> para {appt.serviceName} - {format(appt.startTime, "PPP 'às' HH:mm")}.
+                      </>
+                    )}
+                    {appt.status === 'cancelled' && (
+                      <>
+                        Reserva cancelada: <span className="font-medium">{appt.clientName}</span> - {format(appt.startTime, "PPP 'às' HH:mm")}.
+                      </>
+                    )}
+                    {appt.status === 'confirmed' && (
+                      <>
+                        Reserva confirmada: <span className="font-medium">{appt.clientName}</span> para {appt.serviceName} - {format(appt.startTime, "PPP 'às' HH:mm")}.
+                      </>
+                    )}
+                    {appt.status === 'completed' && (
+                      <>
+                        Reserva concluída: <span className="font-medium">{appt.clientName}</span> para {appt.serviceName} - {format(appt.startTime, "PPP 'às' HH:mm")}.
+                      </>
+                    )}
+                  </li>
+                ))
+              ) : (
+                <li className="text-sm text-muted-foreground">Nenhuma atividade recente.</li>
+              )}
             </ul>
-            <Button variant="link" className="mt-2 px-0">Ver toda a atividade</Button>
+            <Link href="/admin/agendamentos" passHref>
+              <Button variant="link" className="mt-2 px-0">Ver toda a atividade</Button>
+            </Link>
           </CardContent>
         </Card>
       </div>

@@ -74,11 +74,11 @@ export default function ManageServicesPage() {
         );
         setServices(updatedServices);
         setEditingIndex(null);
-        toast({ title: "Sucesso", description: "Serviço atualizado." });
+        toast({ title: "Sucesso", description: "Serviço atualizado localmente. Clique em 'Salvar Serviços' para persistir." }); // Updated toast
       } else {
         // Add new service
         setServices([...services, { name: newServiceName, price, duration }]);
-        toast({ title: "Sucesso", description: "Novo serviço adicionado (ainda não salvo no banco de dados)." });
+        toast({ title: "Sucesso", description: "Novo serviço adicionado localmente. Clique em 'Salvar Serviços' para persistir." }); // Updated toast
       }
       setNewServiceName('');
       setNewServicePrice('');
@@ -97,7 +97,7 @@ export default function ManageServicesPage() {
 
   const handleRemoveService = (indexToRemove: number) => {
     setServices(services.filter((_, index) => index !== indexToRemove));
-    toast({ title: "Serviço Removido", description: "Serviço removido da lista (ainda não salvo no banco de dados)." });
+    toast({ title: "Serviço Removido", description: "Serviço removido localmente. Clique em 'Salvar Serviços' para persistir." }); // Updated toast
   };
 
   const handleSaveServices = async () => {

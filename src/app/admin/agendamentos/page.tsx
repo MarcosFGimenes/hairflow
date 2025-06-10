@@ -1,3 +1,4 @@
+// src/app/admin/agendamentos/page.tsx
 "use client";
 
 import Link from 'next/link';
@@ -19,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 
 // Função para formatar a data e hora
 const formatDateTime = (date: Date) => {
-  return format(date, "d 'de' MMM, yyyy 'às' HH:mm");
+  return format(date, "d 'de' MMM,EEEE 'às' HH:mm");
 };
 
 // Variações de badge para o status
@@ -101,7 +102,7 @@ export default function AppointmentsPage() {
   const filteredAppointments = useMemo(() => {
     return appointments
       .filter(appt => statusFilter === 'all' || appt.status === statusFilter)
-      .filter(appt => 
+      .filter(appt =>
         appt.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         appt.serviceName.toLowerCase().includes(searchTerm.toLowerCase())
       );
@@ -110,7 +111,7 @@ export default function AppointmentsPage() {
   if (authLoading || isLoading) {
     return (
         <>
-        <PageHeader 
+        <PageHeader
           title="Gerenciar Agendamentos"
           description="Visualize, edite e gerencie todas as reservas de clientes."
           actions={
@@ -129,7 +130,7 @@ export default function AppointmentsPage() {
 
   return (
     <>
-      <PageHeader 
+      <PageHeader
         title="Gerenciar Agendamentos"
         description="Visualize, edite e gerencie todas as reservas de clientes."
         actions={
@@ -146,8 +147,8 @@ export default function AppointmentsPage() {
               <CardDescription>Uma lista de todos os agendamentos para o seu salão.</CardDescription>
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
-              <Input 
-                placeholder="Pesquisar cliente ou serviço..." 
+              <Input
+                placeholder="Pesquisar cliente ou serviço..."
                 className="max-w-xs"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
