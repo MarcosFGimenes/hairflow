@@ -1,7 +1,8 @@
+// src/lib/firestoreService.ts
 import { db } from '@/lib/firebase';
 import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, limit, addDoc, orderBy, deleteDoc } from 'firebase/firestore';
-import { getDay, format } from 'date-fns';
-import type { Appointment, TimeSlot, Salon, Professional } from '@/lib/types';
+import { getDay, format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'; // Adicionado date-fns
+import type { Appointment, TimeSlot, Salon, Professional, Service } from '@/lib/types';
 
 // Function to create a URL-friendly slug
 const generateSlug = (name: string): string => {
@@ -19,26 +20,27 @@ const generateSlug = (name: string): string => {
 export const createSalon = async (
   adminUserId: string,
   salonName: string,
-  email: string, // This is the login email for the admin user
+  email: string,
   contactNumber: string,
   address?: string,
   description?: string
 ): Promise<string> => {
   const salonSlug = generateSlug(salonName);
-  const salonRef = doc(db, 'salons', adminUserId); // Use adminUserId as salon document ID
+  const salonRef = doc(db, 'salons', adminUserId);
   const newSalon: Salon = {
-    id: adminUserId, // The document ID is the salon's ID
+    id: adminUserId,
     adminUserId,
     name: salonName,
     slug: salonSlug,
-    email: email, // This should be the contact email for the salon, could be same as admin's login email or different
+    email: email,
     contactNumber: contactNumber,
     address: address || "", 
-    description: description || "", 
+    description: description || "",
+    services: [],
   };
   await setDoc(salonRef, newSalon);
   console.log(`Salon created for user ${adminUserId} with slug ${salonSlug} and details:`, newSalon);
-  return salonSlug; // Or return the full salon object if needed
+  return salonSlug;
 };
 
 // Fetches salon data for a given admin user ID.
@@ -55,8 +57,8 @@ export const getSalonByAdmin = async (adminUserId: string): Promise<Salon | null
 
 // Updates salon settings.
 export const updateSalonSettings = async (
-  adminUserId: string, // Use adminUserId to identify the salon document
-  data: Partial<Omit<Salon, 'id' | 'adminUserId'>> // Data to update
+  adminUserId: string,
+  data: Partial<Omit<Salon, 'id' | 'adminUserId'>>
 ): Promise<void> => {
   const salonRef = doc(db, 'salons', adminUserId);
   
@@ -68,12 +70,31 @@ export const updateSalonSettings = async (
   const currentSalonData = currentSalonSnap.data() as Salon;
 
   const updateData = { ...data };
-  // Ensure slug is regenerated if salonName changes and is different from current
   if (data.name && data.name !== currentSalonData.name) {
     updateData.slug = generateSlug(data.name);
   }
   await updateDoc(salonRef, updateData);
   console.log(`Salon settings updated for admin user ID: ${adminUserId}`);
+};
+
+// Adds or updates a service for a salon
+export const saveSalonServices = async (salonId: string, services: Service[]): Promise<void> => {
+  const salonRef = doc(db, 'salons', salonId);
+  await updateDoc(salonRef, {
+    services: services,
+  });
+  console.log(`Services updated for salon ${salonId}`);
+};
+
+// Gets services for a salon
+export const getSalonServices = async (salonId: string): Promise<Service[]> => {
+  const salonRef = doc(db, 'salons', salonId);
+  const salonSnap = await getDoc(salonRef);
+  if (salonSnap.exists()) {
+    const data = salonSnap.data();
+    return (data.services || []) as Service[];
+  }
+  return [];
 };
 
 // Fetches salon data by its slug.
@@ -98,7 +119,7 @@ export const createProfessional = async (
   const professionalsCollectionRef = collection(db, 'professionals');
   const newProfessionalDoc = await addDoc(professionalsCollectionRef, {
     ...professionalData,
-    salonId: salonId, // Ensure the professional is associated with the correct salon
+    salonId: salonId,
   });
   console.log(`Professional created with ID: ${newProfessionalDoc.id} for salon ${salonId}`);
   return newProfessionalDoc.id;
@@ -128,7 +149,7 @@ export const getProfessionalsBySalon = async (salonId: string): Promise<Professi
 // Salva a disponibilidade recorrente de um profissional
 export const saveRecurringAvailability = async (
   professionalId: string,
-  availability: any // Idealmente, defina um tipo para isso
+  availability: any
 ): Promise<void> => {
   const profRef = doc(db, 'professionals', professionalId);
   await updateDoc(profRef, {
@@ -140,7 +161,7 @@ export const saveRecurringAvailability = async (
 // Salva as exceções de data (disponível/indisponível)
 export const saveDateOverrides = async (
   professionalId: string,
-  overrides: any[] // Idealmente, defina um tipo para isso
+  overrides: any[]
 ): Promise<void> => {
   const profRef = doc(db, 'professionals', professionalId);
   await updateDoc(profRef, {
@@ -176,7 +197,12 @@ const generateTimeSlots = (start: string, end: string, date: Date, duration = 30
   const endTime = new Date(date);
   endTime.setHours(endHour, endMinute, 0, 0);
 
-  while (currentTime < endTime) {
+  // Ajuste para evitar que o último slot ultrapasse a hora final
+  // Se o endTime for 17:00 e o duration for 30, o último slot deve começar no máximo às 16:30
+  const maxStartTime = new Date(endTime);
+  maxStartTime.setMinutes(endTime.getMinutes() - duration);
+
+  while (currentTime.getTime() <= maxStartTime.getTime()) { // Changed condition to <=
     slots.push(new Date(currentTime));
     currentTime.setMinutes(currentTime.getMinutes() + duration);
   }
@@ -195,13 +221,15 @@ export const getAvailableSlotsForProfessional = async (professionalId: string, s
   }
 
   const professionalData = profSnap.data();
-  const dayOfWeek = format(selectedDate, 'EEEE'); // 'Monday', 'Tuesday', etc.
+  const dayOfWeekIndex = selectedDate.getDay(); // 0 for Sunday, 1 for Monday, ..., 6 for Saturday
+  const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
+  const dayOfWeek = dayNames[dayOfWeekIndex]; // Get the day name in Portuguese
+
   let workHours = professionalData.recurringAvailability?.[dayOfWeek];
 
   // Verificar exceções (overrides)
   const dateOverrides = professionalData.dateOverrides || [];
   const override = dateOverrides.find((o: any) => {
-    // Suporta tanto Firestore Timestamp quanto string ISO
     const overrideDate = o.date?.seconds
       ? new Date(o.date.seconds * 1000)
       : (typeof o.date === 'string' ? new Date(o.date) : undefined);
@@ -223,34 +251,39 @@ export const getAvailableSlotsForProfessional = async (professionalId: string, s
   const allPossibleSlots = generateTimeSlots(workHours.startTime, workHours.endTime, selectedDate);
 
   // Buscar agendamentos existentes para filtrar
-  const startOfDay = new Date(selectedDate);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(selectedDate);
-  endOfDay.setHours(23, 59, 59, 999);
+  const startOfSelectedDay = startOfDay(selectedDate);
+  const endOfSelectedDay = endOfDay(selectedDate);
 
   const appointmentsQuery = query(
     collection(db, 'appointments'),
     where('professionalId', '==', professionalId),
-    where('startTime', '>=', startOfDay),
-    where('startTime', '<=', endOfDay)
+    where('startTime', '>=', startOfSelectedDay),
+    where('startTime', '<=', endOfSelectedDay),
+    // Consider only 'scheduled' and 'confirmed' appointments as booked
+    where('status', 'in', ['scheduled', 'confirmed']) // NEW: Filter by relevant statuses
   );
   
   const appointmentsSnapshot = await getDocs(appointmentsQuery);
-  const bookedStartTimes = appointmentsSnapshot.docs.map(doc => {
+  const bookedSlots = appointmentsSnapshot.docs.map(doc => {
     const data = doc.data();
-    // Suporta tanto Firestore Timestamp quanto string ISO
-    if (data.startTime?.seconds) {
-      return new Date(data.startTime.seconds * 1000).getTime();
-    }
-    if (typeof data.startTime === 'string') {
-      return new Date(data.startTime).getTime();
-    }
-    return null;
-  }).filter(Boolean);
+    // Ensure startTime and endTime are Date objects for accurate comparison
+    const apptStartTime = data.startTime?.toDate ? data.startTime.toDate() : new Date(data.startTime);
+    const apptEndTime = data.endTime?.toDate ? data.endTime.toDate() : new Date(data.endTime);
+    return { startTime: apptStartTime.getTime(), endTime: apptEndTime.getTime() };
+  });
 
   // Filtrar slots já agendados
   const availableTimeSlots: TimeSlot[] = allPossibleSlots
-    .filter(slotTime => !bookedStartTimes.includes(slotTime.getTime()))
+    .filter(slotTime => {
+      const slotEndTime = new Date(slotTime);
+      slotEndTime.setMinutes(slotEndTime.getMinutes() + 30); // Assuming 30min duration for a slot
+      
+      // Check if this slot overlaps with any booked appointment
+      return !bookedSlots.some(bookedAppt => {
+        // Check for overlap: (start1 < end2) && (end1 > start2)
+        return (slotTime.getTime() < bookedAppt.endTime) && (slotEndTime.getTime() > bookedAppt.startTime);
+      });
+    })
     .map((slotTime, index) => {
       const endTime = new Date(slotTime);
       endTime.setMinutes(endTime.getMinutes() + 30); // Assumindo duração de 30min
@@ -260,7 +293,7 @@ export const getAvailableSlotsForProfessional = async (professionalId: string, s
         salonId: professionalData.salonId,
         startTime: slotTime,
         endTime: endTime,
-        isBooked: false,
+        isBooked: false, // Mark as false because it's available after filtering
       };
     });
 
@@ -272,11 +305,10 @@ export const getAppointmentsBySalon = async (salonId: string): Promise<Appointme
   if (!salonId) return [];
 
   const appointmentsCollectionRef = collection(db, 'appointments');
-  // Criamos a query para filtrar por salonId e ordenar por data de início descendente
   const q = query(
     appointmentsCollectionRef, 
     where('salonId', '==', salonId),
-    orderBy('startTime', 'desc') // Ordena para mostrar os mais recentes primeiro
+    orderBy('startTime', 'desc')
   );
   
   const querySnapshot = await getDocs(q);
@@ -285,13 +317,11 @@ export const getAppointmentsBySalon = async (salonId: string): Promise<Appointme
     return [];
   }
   
-  // Mapeia os documentos para o tipo Appointment, convertendo Timestamps para Dates
   const appointments: Appointment[] = querySnapshot.docs.map(doc => {
     const data = doc.data();
     return {
       id: doc.id,
       ...data,
-      // É crucial converter os Timestamps do Firestore para objetos Date do JavaScript
       startTime: data.startTime.toDate(),
       endTime: data.endTime.toDate(),
     } as Appointment;
@@ -300,12 +330,59 @@ export const getAppointmentsBySalon = async (salonId: string): Promise<Appointme
   return appointments;
 };
 
+// Function to get appointments for a specific period (daily, weekly, monthly)
+export const getAppointmentsForReporting = async (
+  salonId: string,
+  period: 'daily' | 'weekly' | 'monthly'
+): Promise<Appointment[]> => {
+  if (!salonId) return [];
+
+  const now = new Date();
+  let startDate: Date;
+  let endDate: Date;
+
+  if (period === 'daily') {
+    startDate = startOfDay(now);
+    endDate = endOfDay(now);
+  } else if (period === 'weekly') {
+    // startOfWeek uses Sunday as default start, locale might affect it
+    startDate = startOfWeek(now, { weekStartsOn: 0 }); // Sunday as start of week
+    endDate = endOfWeek(now, { weekStartsOn: 0 });
+  } else { // monthly
+    startDate = startOfMonth(now);
+    endDate = endOfMonth(now);
+  }
+
+  const appointmentsCollectionRef = collection(db, 'appointments');
+  const q = query(
+    appointmentsCollectionRef,
+    where('salonId', '==', salonId),
+    where('status', '==', 'completed'), // Only count completed appointments for revenue
+    where('startTime', '>=', startDate),
+    where('startTime', '<=', endDate),
+    orderBy('startTime', 'desc')
+  );
+
+  const querySnapshot = await getDocs(q);
+  const appointments: Appointment[] = querySnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      ...data,
+      startTime: data.startTime.toDate(),
+      endTime: data.endTime.toDate(),
+    } as Appointment;
+  });
+
+  return appointments;
+};
+
+
 // Cria um novo agendamento no Firestore
 export const createAppointment = async (appointmentData: Omit<Appointment, 'id'>): Promise<Appointment> => {
   const appointmentsCollectionRef = collection(db, 'appointments');
   const newAppointmentDocRef = await addDoc(appointmentsCollectionRef, appointmentData);
   
-  // Retorna o agendamento completo, incluindo o novo ID gerado pelo Firestore
   return {
     id: newAppointmentDocRef.id,
     ...appointmentData
@@ -319,10 +396,7 @@ export const updateAppointmentStatus = async (appointmentId: string, status: App
 };
 
 // Cancela (deleta) um agendamento.
-// Uma abordagem melhor poderia ser apenas atualizar o status para 'cancelled'.
-// Vamos usar a atualização de status para manter o histórico.
 export const cancelAppointment = async (appointmentId: string): Promise<void> => {
-  // Em vez de deletar, vamos apenas mudar o status para 'cancelled'
   await updateAppointmentStatus(appointmentId, 'cancelled');
 };
 
@@ -335,7 +409,7 @@ export const deleteAppointment = async (appointmentId: string): Promise<void> =>
 // Busca todos os salões cadastrados no Firestore
 export const getAllSalons = async (): Promise<Salon[]> => {
   const salonsCollectionRef = collection(db, 'salons');
-  const q = query(salonsCollectionRef); // Query simples para pegar todos
+  const q = query(salonsCollectionRef);
   
   const querySnapshot = await getDocs(q);
   if (querySnapshot.empty) {
@@ -350,5 +424,3 @@ export const getAllSalons = async (): Promise<Salon[]> => {
   
   return salons;
 };
-
-

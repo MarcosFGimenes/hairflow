@@ -1,9 +1,8 @@
-// src/app/appointments/[salonname]/page.tsx
-
+// src/app/agendar/[salonname]/page.tsx
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { getProfessionalsBySalon, getSalonBySlug, getAvailableSlotsForProfessional, createAppointment } from '@/lib/firestoreService'; // Adicionado createAppointment e getAvailableSlotsForProfessional
+import { getProfessionalsBySalon, getSalonBySlug, getAvailableSlotsForProfessional, createAppointment, getSalonServices } from '@/lib/firestoreService';
 import { useParams, useRouter } from 'next/navigation';
 import { GlobalHeader } from '@/components/shared/GlobalHeader';
 import { GlobalFooter } from '@/components/shared/GlobalFooter';
@@ -16,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import type { Salon, Professional, TimeSlot, Appointment } from '@/lib/types';
+import type { Salon, Professional, TimeSlot, Appointment, Service } from '@/lib/types';
 import { User, Phone, Briefcase, Calendar as CalendarIconLucide, Clock, CheckCircle, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import Image from 'next/image';
@@ -49,14 +48,16 @@ export default function SalonAppointmentPage() {
   const [confirmedAppointment, setConfirmedAppointment] = useState<Appointment | null>(null);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   
-  const [selectedService, setSelectedService] = useState<string>("Corte de Cabelo Padrão"); 
-  const services = ["Corte de Cabelo Padrão", "Aparar Barba", "Lavagem e Estilo", "Corte Infantil"];
+  const [salonServices, setSalonServices] = useState<Service[]>([]);
+  const [selectedServiceName, setSelectedServiceName] = useState<string | undefined>();
 
   const currentProfessional = useMemo(() => professionals.find(p => p.id === selectedProfessionalId), [professionals, selectedProfessionalId]);
+  const selectedService = useMemo(() => salonServices.find(s => s.name === selectedServiceName), [salonServices, selectedServiceName]);
+
 
   useEffect(() => {
     if (salonSlug) {
-      const fetchSalonAndProfessionals = async () => {
+      const fetchSalonAndData = async () => {
         setIsLoadingSalon(true);
         const fetchedSalon = await getSalonBySlug(salonSlug);
         if (fetchedSalon) {
@@ -66,21 +67,27 @@ export default function SalonAppointmentPage() {
           if (salonProfessionals.length > 0) {
             setSelectedProfessionalId(salonProfessionals[0].id);
           }
+          const fetchedServices = await getSalonServices(fetchedSalon.id);
+          setSalonServices(fetchedServices);
+          if (fetchedServices.length > 0) {
+            setSelectedServiceName(fetchedServices[0].name);
+          }
         } else {
           toast({ title: "Salão Não Encontrado", description: "Este salão não existe ou a URL está incorreta.", variant: "destructive"});
         }
         setIsLoadingSalon(false);
       };
-      fetchSalonAndProfessionals();
+      fetchSalonAndData();
     }
   }, [salonSlug, router, toast]);
 
-  // *** LÓGICA ATUALIZADA AQUI ***
+  // Lógica para buscar slots disponíveis quando a data ou o profissional muda
   useEffect(() => {
     const fetchSlots = async () => {
         if (selectedDate && selectedProfessionalId) {
             setIsLoadingSlots(true);
-            const slots = await getAvailableSlotsForProfessional(selectedProfessionalId, selectedDate);
+            // Pass a new Date object to ensure no mutation issues with previous states
+            const slots = await getAvailableSlotsForProfessional(selectedProfessionalId, new Date(selectedDate));
             setAvailableSlots(slots);
             setIsLoadingSlots(false);
         } else {
@@ -99,8 +106,8 @@ export default function SalonAppointmentPage() {
     if (currentStep === 2 && !selectedSlot) {
         toast({ title: "Atenção", description: "Por favor, selecione um horário.", variant: "destructive" }); return;
     }
-    if (currentStep === 3 && (!clientName || !clientPhone)) {
-        toast({ title: "Atenção", description: "Por favor, preencha seu nome e telefone.", variant: "destructive" }); return;
+    if (currentStep === 3 && (!clientName || !clientPhone || !selectedServiceName)) {
+        toast({ title: "Atenção", description: "Por favor, preencha seu nome, telefone e selecione um serviço.", variant: "destructive" }); return;
     }
     if (currentStep < steps.length) {
         setCurrentStep(currentStep + 1);
@@ -111,7 +118,7 @@ export default function SalonAppointmentPage() {
   const handleSubmitBooking = async () => {
     if (!salon || !selectedProfessionalId || !selectedSlot || !clientName || !clientPhone || !selectedService || !currentProfessional) return;
 
-    setIsConfirming(true); // Mostra o spinner no botão
+    setIsConfirming(true);
 
     try {
         const appointmentData = {
@@ -120,25 +127,24 @@ export default function SalonAppointmentPage() {
             clientName,
             clientPhone,
             clientEmail: '', // Pode ser adicionado no formulário se desejar
-            serviceName: selectedService,
+            serviceName: selectedService.name,
             startTime: selectedSlot.startTime,
             endTime: selectedSlot.endTime,
             status: 'scheduled',
-            // Adicione outros campos se necessário, como preço
+            price: selectedService.price,
         } as Omit<Appointment, 'id'>;
 
-        // A função `createAppointment` agora retorna o agendamento completo com ID
         const newAppointment = await createAppointment(appointmentData);
 
         setConfirmedAppointment(newAppointment);
-        setCurrentStep(4); // Vai para a tela de confirmação
+        setCurrentStep(4);
         toast({ title: "Agendamento Enviado!", description: "Seu pedido de agendamento foi enviado com sucesso."});
 
     } catch(error) {
         console.error("Booking error:", error);
         toast({ title: "Erro no Agendamento", description: "Não foi possível criar seu agendamento. Tente novamente.", variant: "destructive" });
     } finally {
-        setIsConfirming(false); // Esconde o spinner
+        setIsConfirming(false);
     }
   };
 
@@ -257,14 +263,18 @@ export default function SalonAppointmentPage() {
                 </CardHeader>
                 <div>
                   <Label htmlFor="service" className="font-medium">Serviço</Label>
-                  <Select value={selectedService} onValueChange={setSelectedService}>
-                    <SelectTrigger id="service">
-                      <SelectValue placeholder="Selecione um serviço" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {services.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  {salonServices.length > 0 ? (
+                    <Select value={selectedServiceName} onValueChange={setSelectedServiceName}>
+                      <SelectTrigger id="service">
+                        <SelectValue placeholder="Selecione um serviço" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {salonServices.map(s => <SelectItem key={s.name} value={s.name}>{s.name} (R$ {s.price.toFixed(2)})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Nenhum serviço cadastrado para este salão.</p>
+                  )}
                 </div>
                 <div>
                   <Label htmlFor="clientName" className="font-medium">Nome Completo</Label>
@@ -285,7 +295,7 @@ export default function SalonAppointmentPage() {
                      {selectedDate && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><CalendarIconLucide size={14}/> {format(selectedDate, 'd ')} de {format(selectedDate, 'MMMM')}</p>}
                      {selectedSlot && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Clock size={14}/> {format(new Date(selectedSlot.startTime), 'p')}</p>}
                      {currentProfessional && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><User size={14}/> {currentProfessional.name}</p>}
-                     {selectedService && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Briefcase size={14}/> {selectedService}</p>}
+                     {selectedService && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Briefcase size={14}/> {selectedService.name} (R$ {selectedService.price.toFixed(2)})</p>}
                 </div>
               </div>
             )}
@@ -318,7 +328,6 @@ export default function SalonAppointmentPage() {
         </Card>
       </main>
       <GlobalFooter />
-      {/* O Dialog de confirmação agora é acionado pelo estado `confirmedAppointment` */}
       {confirmedAppointment && salon && currentProfessional && (
         <ConfirmationDialog
           isOpen={!!confirmedAppointment}

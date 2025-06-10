@@ -1,4 +1,4 @@
-
+// src/lib/types.ts
 export interface Salon {
   id: string; // This will often be the adminUserId or a Firestore-generated ID
   name: string;
@@ -8,15 +8,14 @@ export interface Salon {
   adminUserId: string; // ID of the Firebase user who owns this salon
   description?: string; // New field for salon description
   email?: string; // Contact email for the salon
-  // openingHours: OpeningHours[]; // Define structure for opening hours
+  services?: Service[]; // NEW: Array of services offered by the salon
 }
 
-// export interface OpeningHours {
-//   dayOfWeek: 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday' | 'Sunday';
-//   isOpen: boolean;
-//   openTime?: string; // e.g., "09:00"
-//   closeTime?: string; // e.g., "17:00"
-// }
+export interface Service {
+  name: string;
+  price: number;
+  duration: number; // Duration in minutes
+}
 
 export interface Professional {
   id: string;
