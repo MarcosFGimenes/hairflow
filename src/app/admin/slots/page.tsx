@@ -1,15 +1,17 @@
 "use client";
 
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { Label } from '@/components/ui/label'; // Mantido para campos não-formulário, se houver
+import { Textarea } from '@/components/ui/textarea';
+import { PageHeader } from '@/components/shared/PageHeader';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { PageHeader } from '@/components/shared/PageHeader';
 import { getProfessionalsBySalon, 
   getProfessionalAvailability, 
   saveRecurringAvailability, 
@@ -18,13 +20,12 @@ import { getProfessionalsBySalon,
 import { useToast } from "@/hooks/use-toast";
 import type { Professional } from '@/lib/types';
 import { CalendarIcon, Clock, PlusCircle, Trash2, Loader2, Users } from 'lucide-react';
-import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSearchParams, useRouter } from 'next/navigation'; // Hooks para gerenciar URL params
 
-const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const daysOfWeek = ['Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
 
 export default function ManageSlotsPage() {
   const { user, loading: authLoading } = useAuth();
@@ -115,7 +116,7 @@ export default function ManageSlotsPage() {
   const handleAddOverride = () => {
     if (overrideDate) {
       setSpecificOverrides([...specificOverrides, { date: overrideDate, startTime: overrideStartTime, endTime: overrideEndTime, type: overrideType }]);
-      setOverrideDate(undefined); // Reset after adding
+      setOverrideDate(undefined); // Reseta após adicionar
     }
   };
   
@@ -163,12 +164,12 @@ export default function ManageSlotsPage() {
     return (
       <>
         <PageHeader 
-          title="Manage Availability"
-          description="Set working hours for your professionals and manage specific date availabilities."
+          title="Gerenciar Disponibilidade"
+          description="Defina os horários de trabalho para seus profissionais e gerencie a disponibilidade de datas específicas."
         />
         <div className="flex min-h-[calc(100vh-300px)] items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="ml-4 text-lg">Loading availability settings...</p>
+          <p className="ml-4 text-lg">Carregando configurações de disponibilidade...</p>
         </div>
       </>
     );
@@ -177,21 +178,21 @@ export default function ManageSlotsPage() {
   return (
     <>
       <PageHeader 
-        title="Manage Availability"
-        description="Set working hours for your professionals and manage specific date availabilities."
+        title="Gerenciar Disponibilidade"
+        description="Defina os horários de trabalho para seus profissionais e gerencie a disponibilidade de datas específicas."
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Professional Selection */}
+        {/* Seleção de Profissional */}
         <Card className="lg:col-span-1 shadow-lg">
           <CardHeader>
-            <CardTitle className="font-headline flex items-center gap-2"><Users className="h-5 w-5 text-primary" />Select Professional</CardTitle>
+            <CardTitle className="font-headline flex items-center gap-2"><Users className="h-5 w-5 text-primary" />Selecionar Profissional</CardTitle>
           </CardHeader>
           <CardContent>
             {salonProfessionals.length > 0 ? (
               <Select value={selectedProfessional} onValueChange={handleProfessionalChange}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Select a professional" />
+                  <SelectValue placeholder="Selecione um profissional" />
                 </SelectTrigger>
                 <SelectContent>
                   {salonProfessionals.map(prof => (
@@ -200,21 +201,21 @@ export default function ManageSlotsPage() {
                 </SelectContent>
               </Select>
             ) : (
-              <p className="text-sm text-muted-foreground">No professionals found for your salon. Please add professionals first.</p>
+              <p className="text-sm text-muted-foreground">Nenhum profissional encontrado para o seu salão. Por favor, adicione profissionais primeiro.</p>
             )}
             {selectedProfessional && salonProfessionals.length > 0 && (
-                 <p className="mt-2 text-sm text-muted-foreground">Managing availability for {salonProfessionals.find(p => p.id === selectedProfessional)?.name}.</p>
+                     <p className="mt-2 text-sm text-muted-foreground">Gerenciando a disponibilidade para {salonProfessionals.find(p => p.id === selectedProfessional)?.name}.</p>
             )}
           </CardContent>
         </Card>
 
-        {/* Recurring Availability (Only if a professional is selected and available) */}
+        {/* Disponibilidade Recorrente (Somente se um profissional estiver selecionado e disponível) */}
         {selectedProfessional && salonProfessionals.length > 0 ? (
           <>
             <Card className="lg:col-span-2 shadow-lg">
               <CardHeader>
-                <CardTitle className="font-headline">Recurring Weekly Availability</CardTitle>
-                <CardDescription>Set the standard working hours for each day of the week for the selected professional.</CardDescription>
+                <CardTitle className="font-headline">Disponibilidade Semanal Recorrente</CardTitle>
+                <CardDescription>Defina os horários de trabalho padrão para cada dia da semana para o profissional selecionado.</CardDescription>
               </CardHeader>
               <CardContent>
                 <Accordion type="multiple" className="w-full">
@@ -229,11 +230,11 @@ export default function ManageSlotsPage() {
                             onCheckedChange={(checked) => handleRecurringChange(day, 'isOpen', !!checked)}
                             disabled={!selectedProfessional || isSavingRecurring}
                           />
-                          <Label htmlFor={`isOpen-${day}`}>Open on {day}</Label>
+                          <Label htmlFor={`isOpen-${day}`}>Aberto(a) na {day}</Label>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div>
-                            <Label htmlFor={`startTime-${day}`}>Start Time</Label>
+                            <Label htmlFor={`startTime-${day}`}>Hora de Início</Label>
                             <Input 
                               type="time" 
                               id={`startTime-${day}`}
@@ -243,7 +244,7 @@ export default function ManageSlotsPage() {
                             />
                           </div>
                           <div>
-                            <Label htmlFor={`endTime-${day}`}>End Time</Label>
+                            <Label htmlFor={`endTime-${day}`}>Hora de Término</Label>
                             <Input 
                               type="time" 
                               id={`endTime-${day}`}
@@ -259,23 +260,23 @@ export default function ManageSlotsPage() {
                 </Accordion>
                 <Button onClick={handleSaveRecurring} disabled={isSavingRecurring || !selectedProfessional} className="mt-6 w-full bg-primary hover:bg-primary/90">
                   {isSavingRecurring && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                  Save Recurring Availability
+                  Salvar Disponibilidade Recorrente
                 </Button>
               </CardContent>
             </Card>
 
-            {/* Specific Date Overrides */}
+            {/* Exceções de Data Específicas */}
             <Card className="lg:col-span-3 shadow-lg">
               <CardHeader>
-                <CardTitle className="font-headline">Specific Date Overrides</CardTitle>
-                <CardDescription>Add or block specific dates and times for the selected professional, overriding recurring settings.</CardDescription>
+                <CardTitle className="font-headline">Exceções de Data Específicas</CardTitle>
+                <CardDescription>Adicione ou bloqueie datas e horários específicos para o profissional selecionado, substituindo as configurações recorrentes.</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4 mb-6 p-4 border rounded-md">
-                  <h4 className="font-semibold text-md">Add New Override</h4>
+                  <h4 className="font-semibold text-md">Adicionar Nova Exceção</h4>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                     <div>
-                      <Label htmlFor="override-date">Date</Label>
+                      <Label htmlFor="override-date">Data</Label>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -286,7 +287,7 @@ export default function ManageSlotsPage() {
                             )}
                           >
                             <CalendarIcon className="mr-2 h-4 w-4" />
-                            {overrideDate ? format(overrideDate, "PPP") : <span>Pick a date</span>}
+                            {overrideDate ? format(overrideDate, "PPP") : <span>Selecione uma data</span>}
                           </Button>
                         </PopoverTrigger>
                         <PopoverContent className="w-auto p-0">
@@ -300,43 +301,43 @@ export default function ManageSlotsPage() {
                       </Popover>
                     </div>
                     <div>
-                      <Label htmlFor="override-type">Type</Label>
+                      <Label htmlFor="override-type">Tipo</Label>
                       <Select value={overrideType} onValueChange={(value) => setOverrideType(value as 'available' | 'unavailable')}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="available">Available</SelectItem>
-                          <SelectItem value="unavailable">Unavailable (Block Out)</SelectItem>
+                          <SelectItem value="available">Disponível</SelectItem>
+                          <SelectItem value="unavailable">Indisponível (Bloquear)</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
                     {overrideType === 'available' && (
                       <>
                         <div>
-                          <Label htmlFor="override-startTime">Start Time</Label>
+                          <Label htmlFor="override-startTime">Hora de Início</Label>
                           <Input type="time" id="override-startTime" value={overrideStartTime} onChange={e => setOverrideStartTime(e.target.value)} />
                         </div>
                         <div>
-                          <Label htmlFor="override-endTime">End Time</Label>
+                          <Label htmlFor="override-endTime">Hora de Término</Label>
                           <Input type="time" id="override-endTime" value={overrideEndTime} onChange={e => setOverrideEndTime(e.target.value)} />
                         </div>
                       </>
                     )}
                     <Button onClick={handleAddOverride} disabled={!overrideDate} className="lg:mt-auto bg-accent hover:bg-accent/90">
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Override
+                      <PlusCircle className="mr-2 h-4 w-4" /> Adicionar Exceção
                     </Button>
                   </div>
                 </div>
 
                 {specificOverrides.length > 0 && (
                   <div>
-                    <h4 className="font-semibold text-md mb-2">Current Overrides:</h4>
+                    <h4 className="font-semibold text-md mb-2">Exceções Atuais:</h4>
                     <ul className="space-y-2">
                       {specificOverrides.map((override, index) => (
                         <li key={index} className="flex justify-between items-center p-3 border rounded-md bg-muted/50">
                           <div>
                             <span className="font-medium">{format(override.date!, "PPP")}</span> -
                             <span className={`ml-1 ${override.type === 'available' ? 'text-green-600' : 'text-red-600'}`}>
-                              {override.type === 'available' ? `Available ${override.startTime} - ${override.endTime}` : 'Blocked Out'}
+                              {override.type === 'available' ? `Disponível das ${override.startTime} às ${override.endTime}` : 'Bloqueado'}
                             </span>
                           </div>
                           <Button variant="ghost" size="icon" onClick={() => handleRemoveOverride(index)} className="text-destructive">
@@ -348,26 +349,26 @@ export default function ManageSlotsPage() {
                   </div>
                 )}
                 {specificOverrides.length === 0 && (
-                    <p className="text-muted-foreground text-center py-4">No specific overrides added yet for this professional.</p>
+                    <p className="text-muted-foreground text-center py-4">Nenhuma exceção específica adicionada ainda para este profissional.</p>
                 )}
                 <Button onClick={handleSaveOverrides} disabled={isSavingOverrides || !selectedProfessional} className="mt-6 w-full bg-primary hover:bg-primary/90">
                   {isSavingOverrides && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                  Save All Overrides
+                  Salvar Todas as Exceções
                 </Button>
               </CardContent>
             </Card>
           </>
         ) : (
           <Card className="lg:col-span-2 shadow-lg">
-             <CardHeader>
-                <CardTitle className="font-headline">Manage Availability</CardTitle>
-             </CardHeader>
+               <CardHeader>
+                 <CardTitle className="font-headline">Gerenciar Disponibilidade</CardTitle>
+               </CardHeader>
             <CardContent className="text-center py-10">
               <Clock className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-muted-foreground">
                 {salonProfessionals.length === 0 
-                  ? "Please add professionals to your salon first to manage their availability."
-                  : "Select a professional to manage their recurring availability and specific date overrides."}
+                  ? "Por favor, adicione profissionais ao seu salão primeiro para gerenciar a disponibilidade deles."
+                  : "Selecione um profissional para gerenciar sua disponibilidade recorrente e exceções de datas específicas."}
               </p>
             </CardContent>
           </Card>

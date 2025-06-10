@@ -20,7 +20,7 @@ export default function HomePage() {
               A solução de agendamento de horários perfeita para barbearias e salões modernos. Eleve seu negócio e encante seus clientes.
             </p>
             <div className="flex justify-center gap-4">
-              <Link href="/appointments">
+              <Link href="/agendar">
                 <Button size="lg" variant="default" className="bg-accent hover:bg-accent/90 text-accent-foreground">
                   Agendar um Horário
                 </Button>

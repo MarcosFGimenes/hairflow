@@ -1,5 +1,3 @@
-// src/app/admin/appointments/page.tsx
-
 "use client";
 
 import Link from 'next/link';
@@ -19,10 +17,12 @@ import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from "@/hooks/use-toast";
 
-// ... (Funções formatDateTime, statusBadgeVariant, statusIcon permanecem as mesmas)
+// Função para formatar a data e hora
 const formatDateTime = (date: Date) => {
-  return format(date, "MMM d, yyyy 'at' h:mm a");
+  return format(date, "d 'de' MMM, yyyy 'às' HH:mm");
 };
+
+// Variações de badge para o status
 const statusBadgeVariant = (status: Appointment['status']): "default" | "secondary" | "destructive" | "outline" => {
     switch (status) {
         case 'confirmed': return 'default';
@@ -32,6 +32,8 @@ const statusBadgeVariant = (status: Appointment['status']): "default" | "seconda
         default: return 'secondary';
     }
 };
+
+// Ícones para o status
 const statusIcon = (status: Appointment['status']) => {
     switch (status) {
         case 'confirmed': return <CheckCircle className="h-4 w-4 text-green-500" />;
@@ -106,21 +108,20 @@ export default function AppointmentsPage() {
   }, [appointments, statusFilter, searchTerm]);
 
   if (authLoading || isLoading) {
-    // ... (tela de loading)
     return (
         <>
         <PageHeader 
-          title="Manage Appointments"
-          description="View, edit, and manage all client bookings."
+          title="Gerenciar Agendamentos"
+          description="Visualize, edite e gerencie todas as reservas de clientes."
           actions={
-            <Link href="/admin/appointments/new">
-              <Button disabled><PlusCircle className="mr-2 h-4 w-4" /> New Appointment</Button>
+            <Link href="/admin/agendamentos/new">
+              <Button disabled><PlusCircle className="mr-2 h-4 w-4" /> Novo Agendamento</Button>
             </Link>
           }
         />
         <div className="flex min-h-[calc(100vh-300px)] items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="ml-4 text-lg">Loading appointments...</p>
+          <p className="ml-4 text-lg">Carregando agendamentos...</p>
         </div>
       </>
     )
@@ -129,11 +130,11 @@ export default function AppointmentsPage() {
   return (
     <>
       <PageHeader 
-        title="Manage Appointments"
-        description="View, edit, and manage all client bookings."
+        title="Gerenciar Agendamentos"
+        description="Visualize, edite e gerencie todas as reservas de clientes."
         actions={
-          <Link href="/admin/appointments/new">
-            <Button><PlusCircle className="mr-2 h-4 w-4" /> New Appointment</Button>
+          <Link href="/admin/agendamentos/new">
+            <Button><PlusCircle className="mr-2 h-4 w-4" /> Novo Agendamento</Button>
           </Link>
         }
       />
@@ -141,26 +142,26 @@ export default function AppointmentsPage() {
         <CardHeader>
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <div>
-              <CardTitle className="font-headline">Your Salon's Bookings</CardTitle>
-              <CardDescription>A list of all appointments for your salon.</CardDescription>
+              <CardTitle className="font-headline">Reservas do Seu Salão</CardTitle>
+              <CardDescription>Uma lista de todos os agendamentos para o seu salão.</CardDescription>
             </div>
             <div className="flex gap-2 w-full sm:w-auto">
               <Input 
-                placeholder="Search client or service..." 
+                placeholder="Pesquisar cliente ou serviço..." 
                 className="max-w-xs"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Filter</Button>
+                  <Button variant="outline"><Filter className="mr-2 h-4 w-4" /> Filtrar</Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onSelect={() => setStatusFilter('all')}>All Statuses</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setStatusFilter('scheduled')}>Scheduled</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setStatusFilter('confirmed')}>Confirmed</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setStatusFilter('completed')}>Completed</DropdownMenuItem>
-                  <DropdownMenuItem onSelect={() => setStatusFilter('cancelled')}>Cancelled</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setStatusFilter('all')}>Todos os Status</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setStatusFilter('scheduled')}>Agendados</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setStatusFilter('confirmed')}>Confirmados</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setStatusFilter('completed')}>Concluídos</DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => setStatusFilter('cancelled')}>Cancelados</DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -170,12 +171,12 @@ export default function AppointmentsPage() {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Client</TableHead>
-                <TableHead>Service</TableHead>
-                <TableHead>Professional</TableHead>
-                <TableHead>Date & Time</TableHead>
+                <TableHead>Cliente</TableHead>
+                <TableHead>Serviço</TableHead>
+                <TableHead>Profissional</TableHead>
+                <TableHead>Data e Hora</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead className="text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -191,7 +192,10 @@ export default function AppointmentsPage() {
                   <TableCell>
                     <Badge variant={statusBadgeVariant(appt.status)} className="flex items-center gap-1.5 cursor-pointer">
                       {statusIcon(appt.status)}
-                      {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
+                      {appt.status === 'scheduled' && 'Agendado'}
+                      {appt.status === 'confirmed' && 'Confirmado'}
+                      {appt.status === 'completed' && 'Concluído'}
+                      {appt.status === 'cancelled' && 'Cancelado'}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right">
@@ -202,30 +206,30 @@ export default function AppointmentsPage() {
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             <DropdownMenuItem onSelect={() => handleStatusUpdate(appt.id, 'confirmed')}>
-                                <UserCheck className="mr-2 h-4 w-4" /> Mark as Confirmed
+                                <UserCheck className="mr-2 h-4 w-4" /> Marcar como Confirmado
                             </DropdownMenuItem>
                             <DropdownMenuItem onSelect={() => handleStatusUpdate(appt.id, 'completed')}>
-                                <CheckCircle className="mr-2 h-4 w-4" /> Mark as Completed
+                                <CheckCircle className="mr-2 h-4 w-4" /> Marcar como Concluído
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <AlertDialogTrigger asChild>
                                 <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive" onSelect={(e) => e.preventDefault()}>
-                                    <Trash2 className="mr-2 h-4 w-4" /> Cancel Appointment
+                                    <Trash2 className="mr-2 h-4 w-4" /> Cancelar Agendamento
                                 </DropdownMenuItem>
                             </AlertDialogTrigger>
                           </DropdownMenuContent>
                         </DropdownMenu>
                         <AlertDialogContent>
                             <AlertDialogHeader>
-                                <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                                <AlertDialogTitle>Tem certeza?</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                This action will cancel the appointment for {appt.clientName}. This cannot be undone.
+                                Esta ação irá cancelar o agendamento para {appt.clientName}. Isso não pode ser desfeito.
                                 </AlertDialogDescription>
                             </AlertDialogHeader>
                             <AlertDialogFooter>
-                                <AlertDialogCancel>Back</AlertDialogCancel>
+                                <AlertDialogCancel>Voltar</AlertDialogCancel>
                                 <AlertDialogAction onClick={() => handleCancelAppointment(appt.id)}>
-                                Continue
+                                Continuar
                                 </AlertDialogAction>
                             </AlertDialogFooter>
                         </AlertDialogContent>
@@ -235,7 +239,7 @@ export default function AppointmentsPage() {
               )) : (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center py-10 text-muted-foreground">
-                    No appointments found with the current filters.
+                    Nenhum agendamento encontrado com os filtros atuais.
                   </TableCell>
                 </TableRow>
               )}

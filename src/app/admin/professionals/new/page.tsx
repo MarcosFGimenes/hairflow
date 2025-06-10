@@ -72,25 +72,25 @@ export default function NewProfessionalPage() {
   return (
     <>
       <PageHeader 
-        title="Add New Professional"
-        description="Enter the details for the new staff member."
+        title="Adicionar Novo Profissional"
+        description="Insira os detalhes do novo membro da equipe."
       />
       <Card className="max-w-2xl mx-auto shadow-lg">
         <CardHeader>
           <CardTitle className="font-headline flex items-center gap-2">
-            <UserPlus className="h-6 w-6 text-primary" /> Professional Information
+            <UserPlus className="h-6 w-6 text-primary" /> Informações do Profissional
           </CardTitle>
-          <CardDescription>All fields marked with * are required.</CardDescription>
+          <CardDescription>Todos os campos marcados com * são obrigatórios.</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             
             <div className="space-y-2 text-center">
-              <Label htmlFor="profile-image" className="block text-sm font-medium text-muted-foreground">Profile Image</Label>
+              <Label htmlFor="profile-image" className="block text-sm font-medium text-muted-foreground">Imagem de Perfil</Label>
               <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-border border-dashed rounded-md">
                 <div className="space-y-1 text-center">
                   {imageUrl ? (
-                    <Image src={imageUrl} alt="Profile preview" width={128} height={128} className="mx-auto h-32 w-32 rounded-full object-cover shadow-md" />
+                    <Image src={imageUrl} alt="Prévia do perfil" width={128} height={128} className="mx-auto h-32 w-32 rounded-full object-cover shadow-md" />
                   ) : (
                     <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
                   )}
@@ -99,43 +99,43 @@ export default function NewProfessionalPage() {
                       htmlFor="profile-image-upload"
                       className="relative cursor-pointer rounded-md bg-background font-medium text-primary hover:text-accent focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
                     >
-                      <span>{imageUrl ? 'Change image' : 'Upload an image'}</span>
+                      <span>{imageUrl ? 'Alterar imagem' : 'Carregar uma imagem'}</span>
                       <input id="profile-image-upload" name="profile-image-upload" type="file" className="sr-only" onChange={handleImageUpload} accept="image/*" />
                     </label>
                   </div>
-                  <p className="text-xs text-muted-foreground">PNG, JPG, GIF up to 2MB</p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, GIF até 2MB</p>
                 </div>
               </div>
             </div>
 
             <div>
-              <Label htmlFor="prof-name">Full Name *</Label>
-              <Input id="prof-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g., John Doe" required disabled={isSaving}/>
+              <Label htmlFor="prof-name">Nome Completo *</Label>
+              <Input id="prof-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Ex: João Silva" required disabled={isSaving}/>
             </div>
 
             <div>
-              <Label htmlFor="prof-specialty">Specialty / Role</Label>
-              <Input id="prof-specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="e.g., Senior Stylist, Color Expert" disabled={isSaving}/>
+              <Label htmlFor="prof-specialty">Especialidade / Função</Label>
+              <Input id="prof-specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ex: Estilista Sênior, Especialista em Cores" disabled={isSaving}/>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <Label htmlFor="prof-email">Email Address (Optional)</Label>
-                <Input id="prof-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="john.doe@example.com" disabled={isSaving}/>
+                <Label htmlFor="prof-email">Endereço de E-mail (Opcional)</Label>
+                <Input id="prof-email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="joao.silva@exemplo.com" disabled={isSaving}/>
               </div>
               <div>
-                <Label htmlFor="prof-phone">Phone Number (Optional)</Label>
-                <Input id="prof-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 123-4567" disabled={isSaving}/>
+                <Label htmlFor="prof-phone">Número de Telefone (Opcional)</Label>
+                <Input id="prof-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(55) 12345-6789" disabled={isSaving}/>
               </div>
             </div>
             
             <div className="flex justify-end gap-3 pt-6 border-t">
               <Link href="/admin/professionals">
-                <Button variant="outline" type="button" disabled={isSaving}>Cancel</Button>
+                <Button variant="outline" type="button" disabled={isSaving}>Cancelar</Button>
               </Link>
               <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                {isSaving ? 'Saving...' : 'Save Professional'}
+                {isSaving ? 'Salvando...' : 'Salvar Profissional'}
               </Button>
             </div>
           </form>

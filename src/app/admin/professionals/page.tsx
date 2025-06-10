@@ -40,17 +40,17 @@ export default function ProfessionalsPage() {
     return (
       <>
         <PageHeader 
-          title="Manage Professionals"
-          description="Add, edit, or remove staff members for your salon."
+          title="Gerenciar Profissionais"
+          description="Adicione, edite ou remova membros da equipe do seu salão."
           actions={
             <Link href="/admin/professionals/new">
-              <Button disabled><UserPlus className="mr-2 h-4 w-4" /> Add New Professional</Button>
+              <Button disabled><UserPlus className="mr-2 h-4 w-4" /> Adicionar Novo Profissional</Button>
             </Link>
           }
         />
         <div className="flex min-h-[calc(100vh-300px)] items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary" />
-          <p className="ml-4 text-lg">Loading professionals...</p>
+          <p className="ml-4 text-lg">Carregando profissionais...</p>
         </div>
       </>
     );
@@ -59,11 +59,11 @@ export default function ProfessionalsPage() {
   return (
     <>
       <PageHeader 
-        title="Manage Professionals"
-        description="Add, edit, or remove staff members for your salon."
+        title="Gerenciar Profissionais"
+        description="Adicione, edite ou remova membros da equipe do seu salão."
         actions={
           <Link href="/admin/professionals/new">
-            <Button><UserPlus className="mr-2 h-4 w-4" /> Add New Professional</Button>
+            <Button><UserPlus className="mr-2 h-4 w-4" /> Adicionar Novo Profissional</Button>
           </Link>
         }
       />
@@ -71,10 +71,10 @@ export default function ProfessionalsPage() {
         <Card className="shadow-lg">
           <CardContent className="py-10 text-center">
             <UserPlus className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold font-headline text-foreground">No Professionals Added Yet</h3>
-            <p className="text-muted-foreground mb-4">Start by adding your talented staff members to this salon.</p>
+            <h3 className="text-xl font-semibold font-headline text-foreground">Nenhum Profissional Adicionado Ainda</h3>
+            <p className="text-muted-foreground mb-4">Comece adicionando seus talentosos membros da equipe a este salão.</p>
             <Link href="/admin/professionals/new">
-              <Button>Add First Professional</Button>
+              <Button>Adicionar Primeiro Profissional</Button>
             </Link>
           </CardContent>
         </Card>
@@ -101,17 +101,17 @@ export default function ProfessionalsPage() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem>
-                      <Edit className="mr-2 h-4 w-4" /> Edit Profile
+                      <Edit className="mr-2 h-4 w-4" /> Editar Perfil
                   </DropdownMenuItem>
                   <DropdownMenuItem className="text-destructive focus:text-destructive-foreground focus:bg-destructive">
-                    <Trash2 className="mr-2 h-4 w-4" /> Remove
+                    <Trash2 className="mr-2 h-4 w-4" /> Remover
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </CardHeader>
             <CardFooter>
                 <Link href={`/admin/slots?professional=${prof.id}`} className="w-full">
-                    <Button variant="outline" className="w-full">Manage Availability</Button>
+                    <Button variant="outline" className="w-full">Gerenciar Disponibilidade</Button>
                 </Link>
             </CardFooter>
           </Card>

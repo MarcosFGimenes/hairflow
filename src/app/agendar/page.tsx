@@ -124,7 +124,7 @@ export default function AppointmentsLandingPage() {
                                 <CardDescription>{salon.address || 'Endereço não fornecido'}</CardDescription>
                             </CardHeader>
                             <CardFooter>
-                                <Link href={`/appointments/${salon.slug}`} passHref>
+                                <Link href={`/agendar/${salon.slug}`} passHref>
                                     <Button className="w-full bg-primary hover:bg-primary/90">Ver Disponibilidade</Button>
                                 </Link>
                             </CardFooter>
