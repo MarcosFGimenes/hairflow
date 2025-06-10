@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -28,15 +27,15 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 const signupSchema = z.object({
-  salonName: z.string().min(2, { message: "Salon name must be at least 3 characters." }),
-  contactNumber: z.string().min(10, { message: "Contact number must be at least 10 digits." }),
+  salonName: z.string().min(2, { message: "O nome do salão deve ter pelo menos 3 caracteres." }),
+  contactNumber: z.string().min(10, { message: "O número de contato deve ter pelo menos 10 dígitos." }),
   address: z.string().optional(),
-  description: z.string().max(500, "Description can be up to 500 characters.").optional(),
-  email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  description: z.string().max(500, "A descrição pode ter até 500 caracteres.").optional(),
+  email: z.string().email({ message: "Endereço de e-mail inválido." }),
+  password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
   confirmPassword: z.string(),
 }).refine(data => data.password === data.confirmPassword, {
-  message: "Passwords don't match",
+  message: "As senhas não coincidem",
   path: ["confirmPassword"],
 });
 
@@ -75,23 +74,23 @@ export default function SignupPage() {
           data.address,
           data.description
         );
-        toast({ title: "Signup Successful", description: "Salon created. Redirecting to dashboard..." });
+        toast({ title: "Cadastro Bem-sucedido", description: "Salão criado. Redirecionando para o painel..." });
         router.push("/admin"); 
       } else {
-        throw new Error("User creation failed.");
+        throw new Error("Falha na criação do usuário.");
       }
     } catch (error: any) {
-      console.error("Signup error:", error);
-      let errorMessage = "An unexpected error occurred.";
+      console.error("Erro de cadastro:", error);
+      let errorMessage = "Ocorreu um erro inesperado.";
       if (error.code === 'auth/email-already-in-use') {
-        errorMessage = "This email address is already in use.";
+        errorMessage = "Este endereço de e-mail já está em uso.";
       } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "The email address is not valid.";
+        errorMessage = "O endereço de e-mail não é válido.";
       } else if (error.code === 'auth/weak-password') {
-        errorMessage = "The password is too weak.";
+        errorMessage = "A senha é muito fraca.";
       }
       toast({
-        title: "Signup Failed",
+        title: "Falha no Cadastro",
         description: errorMessage,
         variant: "destructive",
       });
@@ -107,8 +106,8 @@ export default function SignupPage() {
       </div>
       <Card className="w-full max-w-lg shadow-2xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-headline">Create Your Salon Account</CardTitle>
-          <CardDescription>Join Hairflow and start managing your appointments seamlessly.</CardDescription>
+          <CardTitle className="text-3xl font-headline">Crie Sua Conta de Salão</CardTitle>
+          <CardDescription>Junte-se ao Hairflow e comece a gerenciar seus agendamentos sem complicações.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -118,9 +117,9 @@ export default function SignupPage() {
                 name="salonName"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Salon Name *</FormLabel>
+                    <FormLabel>Nome do Salão *</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g., Cool Cuts Barbershop" {...field} disabled={isLoading}/>
+                      <Input placeholder="Ex: Barbearia Cortes Top" {...field} disabled={isLoading}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -131,11 +130,11 @@ export default function SignupPage() {
                 name="contactNumber"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Contact Phone Number *</FormLabel>
+                    <FormLabel>Número de Telefone para Contato *</FormLabel>
                     <FormControl>
-                      <Input type="tel" placeholder="(555) 123-4567" {...field} disabled={isLoading}/>
+                      <Input type="tel" placeholder="(55) 12345-6789" {...field} disabled={isLoading}/>
                     </FormControl>
-                    <FormDescription>Used for WhatsApp booking confirmations and client contact.</FormDescription>
+                    <FormDescription>Usado para confirmações de agendamento via WhatsApp e contato com o cliente.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -145,9 +144,9 @@ export default function SignupPage() {
                 name="address"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Salon Address (Optional)</FormLabel>
+                    <FormLabel>Endereço do Salão (Opcional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="123 Main St, Anytown, USA" {...field} disabled={isLoading}/>
+                      <Input placeholder="Rua Principal, 123, Cidade, País" {...field} disabled={isLoading}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -158,9 +157,9 @@ export default function SignupPage() {
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Salon Description (Optional)</FormLabel>
+                    <FormLabel>Descrição do Salão (Opcional)</FormLabel>
                     <FormControl>
-                      <Textarea placeholder="Tell clients a bit about your salon..." {...field} rows={3} disabled={isLoading}/>
+                      <Textarea placeholder="Conte aos clientes um pouco sobre seu salão..." {...field} rows={3} disabled={isLoading}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -171,9 +170,9 @@ export default function SignupPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Login Email Address *</FormLabel>
+                    <FormLabel>Endereço de E-mail para Login *</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading}/>
+                      <Input type="email" placeholder="voce@exemplo.com" {...field} disabled={isLoading}/>
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -184,7 +183,7 @@ export default function SignupPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password *</FormLabel>
+                    <FormLabel>Senha *</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} disabled={isLoading}/>
                     </FormControl>
@@ -197,7 +196,7 @@ export default function SignupPage() {
                 name="confirmPassword"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Confirm Password *</FormLabel>
+                    <FormLabel>Confirmar Senha *</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} disabled={isLoading}/>
                     </FormControl>
@@ -207,16 +206,16 @@ export default function SignupPage() {
               />
               <Button type="submit" className="w-full text-lg py-6 bg-primary hover:bg-primary/90" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                Create Account
+                Criar Conta
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="flex justify-center">
           <p className="text-sm text-muted-foreground">
-            Already have an account?{' '}
+            Já tem uma conta?{' '}
             <Link href="/auth/login" className="font-semibold text-primary hover:underline">
-              Log in
+              Fazer login
             </Link>
           </p>
         </CardFooter>

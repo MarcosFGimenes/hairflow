@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from 'next/link';
@@ -25,8 +24,8 @@ import { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 const loginSchema = z.object({
-  email: z.string().email({ message: "Invalid email address." }),
-  password: z.string().min(6, { message: "Password must be at least 6 characters." }),
+  email: z.string().email({ message: "Endereço de e-mail inválido." }),
+  password: z.string().min(6, { message: "A senha deve ter pelo menos 6 caracteres." }),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -48,18 +47,18 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, data.email, data.password);
-      toast({ title: "Login Successful", description: "Redirecting to dashboard..." });
+      toast({ title: "Login Bem-sucedido", description: "Redirecionando para o painel..." });
       router.push("/admin");
     } catch (error: any) {
-      console.error("Login error:", error);
-      let errorMessage = "An unexpected error occurred.";
+      console.error("Erro de login:", error);
+      let errorMessage = "Ocorreu um erro inesperado.";
       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        errorMessage = "Invalid email or password.";
+        errorMessage = "E-mail ou senha inválidos.";
       } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "The email address is not valid.";
+        errorMessage = "O endereço de e-mail não é válido.";
       }
       toast({
-        title: "Login Failed",
+        title: "Falha no Login",
         description: errorMessage,
         variant: "destructive",
       });
@@ -75,8 +74,8 @@ export default function LoginPage() {
       </div>
       <Card className="w-full max-w-md shadow-2xl">
         <CardHeader className="text-center">
-          <CardTitle className="text-3xl font-headline">Salon Admin Login</CardTitle>
-          <CardDescription>Access your salon dashboard to manage bookings and more.</CardDescription>
+          <CardTitle className="text-3xl font-headline">Login de Administrador do Salão</CardTitle>
+          <CardDescription>Acesse o painel do seu salão para gerenciar agendamentos e muito mais.</CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
@@ -86,9 +85,9 @@ export default function LoginPage() {
                 name="email"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Email Address</FormLabel>
+                    <FormLabel>Endereço de E-mail</FormLabel>
                     <FormControl>
-                      <Input type="email" placeholder="you@example.com" {...field} disabled={isLoading} />
+                      <Input type="email" placeholder="voce@exemplo.com" {...field} disabled={isLoading} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -99,7 +98,7 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <FormLabel>Senha</FormLabel>
                     <FormControl>
                       <Input type="password" placeholder="••••••••" {...field} disabled={isLoading} />
                     </FormControl>
@@ -109,19 +108,19 @@ export default function LoginPage() {
               />
               <Button type="submit" className="w-full text-lg py-6 bg-primary hover:bg-primary/90" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-5 w-5 animate-spin" />}
-                Log In
+                Entrar
               </Button>
             </form>
           </Form>
         </CardContent>
         <CardFooter className="flex flex-col items-center gap-2">
           <Link href="/auth/forgot-password">
-            <Button variant="link" className="text-sm text-muted-foreground">Forgot password?</Button>
+            <Button variant="link" className="text-sm text-muted-foreground">Esqueceu a senha?</Button>
           </Link>
           <p className="text-sm text-muted-foreground">
-            Don&apos;t have an account?{' '}
+            Não tem uma conta?{' '}
             <Link href="/auth/signup" className="font-semibold text-primary hover:underline">
-              Sign up
+              Cadastre-se
             </Link>
           </p>
         </CardFooter>

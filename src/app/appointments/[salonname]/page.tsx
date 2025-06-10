@@ -23,10 +23,10 @@ import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 
 const steps = [
-  { id: 1, name: "Select Date & Professional" },
-  { id: 2, name: "Choose Time Slot" },
-  { id: 3, name: "Your Details" },
-  { id: 4, name: "Confirmation" }
+  { id: 1, name: "Selecionar Data e Profissional" },
+  { id: 2, name: "Escolher Horário" },
+  { id: 3, name: "Seus Detalhes" },
+  { id: 4, name: "Confirmação" }
 ];
 
 export default function SalonAppointmentPage() {
@@ -49,8 +49,8 @@ export default function SalonAppointmentPage() {
   const [confirmedAppointment, setConfirmedAppointment] = useState<Appointment | null>(null);
   const [isLoadingSlots, setIsLoadingSlots] = useState(false);
   
-  const [selectedService, setSelectedService] = useState<string>("Standard Haircut"); 
-  const services = ["Standard Haircut", "Beard Trim", "Hair Wash & Style", "Kids Cut"];
+  const [selectedService, setSelectedService] = useState<string>("Corte de Cabelo Padrão"); 
+  const services = ["Corte de Cabelo Padrão", "Aparar Barba", "Lavagem e Estilo", "Corte Infantil"];
 
   const currentProfessional = useMemo(() => professionals.find(p => p.id === selectedProfessionalId), [professionals, selectedProfessionalId]);
 
@@ -67,7 +67,7 @@ export default function SalonAppointmentPage() {
             setSelectedProfessionalId(salonProfessionals[0].id);
           }
         } else {
-          toast({ title: "Salon Not Found", description: "This salon does not exist or the URL is incorrect.", variant: "destructive"});
+          toast({ title: "Salão Não Encontrado", description: "Este salão não existe ou a URL está incorreta.", variant: "destructive"});
         }
         setIsLoadingSalon(false);
       };
@@ -142,16 +142,13 @@ export default function SalonAppointmentPage() {
     }
   };
 
-  // ... (resto do componente continua o mesmo, incluindo o JSX)
-  // O código abaixo é apenas para referência, não precisa colar de novo se não mudou.
-
   if (isLoadingSalon) {
     return (
       <>
         <GlobalHeader />
         <main className="container mx-auto px-4 py-8 flex-grow text-center flex flex-col items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-          <p className="text-lg text-muted-foreground">Loading salon details...</p>
+          <p className="text-lg text-muted-foreground">Carregando detalhes do salão...</p>
         </main>
         <GlobalFooter />
       </>
@@ -163,9 +160,9 @@ export default function SalonAppointmentPage() {
       <>
         <GlobalHeader />
         <main className="container mx-auto px-4 py-8 flex-grow text-center">
-          <h1 className="text-3xl font-bold font-headline mb-4">Salon Not Found</h1>
-          <p className="text-muted-foreground">The salon you are looking for does not exist or the URL is incorrect.</p>
-          <Button onClick={() => router.push('/')} className="mt-6">Go to Homepage</Button>
+          <h1 className="text-3xl font-bold font-headline mb-4">Salão Não Encontrado</h1>
+          <p className="text-muted-foreground">O salão que você está procurando não existe ou a URL está incorreta.</p>
+          <Button onClick={() => router.push('/')} className="mt-6">Ir para a Página Inicial</Button>
         </main>
         <GlobalFooter />
       </>
@@ -178,7 +175,7 @@ export default function SalonAppointmentPage() {
       <main className="container mx-auto px-4 py-8 flex-grow">
         <Card className="max-w-4xl mx-auto shadow-2xl overflow-hidden">
           <div className="relative h-48 md:h-64 bg-secondary">
-            <Image src={`https://placehold.co/1200x400.png`} alt={`${salon.name} storefront`} layout="fill" objectFit="cover" data-ai-hint="salon storefront"/>
+            <Image src={`https://placehold.co/1200x400.png`} alt={`Fachada de ${salon.name}`} layout="fill" objectFit="cover" data-ai-hint="fachada do salão"/>
             <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4 text-center">
               <h1 className="text-3xl md:text-5xl font-bold font-headline text-white mb-2">{salon.name}</h1>
               {salon.address && <p className="text-lg text-gray-200">{salon.address}</p>}
@@ -207,7 +204,7 @@ export default function SalonAppointmentPage() {
               <div className="space-y-8">
                 <BookingCalendar selectedDate={selectedDate} onDateSelect={setSelectedDate} />
                 <div>
-                  <Label htmlFor="professional" className="text-lg font-semibold mb-2 block text-center">Select Professional</Label>
+                  <Label htmlFor="professional" className="text-lg font-semibold mb-2 block text-center">Selecionar Profissional</Label>
                   {professionals.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {professionals.map(prof => (
@@ -218,7 +215,7 @@ export default function SalonAppointmentPage() {
                         >
                           <div className="flex items-center gap-4">
                             <Avatar className="h-16 w-16">
-                              <AvatarImage src={prof.imageUrl || `https://placehold.co/100x100.png`} alt={prof.name} data-ai-hint="person beauty" />
+                              <AvatarImage src={prof.imageUrl || `https://placehold.co/100x100.png`} alt={prof.name} data-ai-hint="pessoa beleza" />
                               <AvatarFallback>{prof.name.substring(0,1)}</AvatarFallback>
                             </Avatar>
                             <div>
@@ -230,7 +227,7 @@ export default function SalonAppointmentPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-center text-muted-foreground">No professionals available for this salon yet.</p>
+                    <p className="text-center text-muted-foreground">Nenhum profissional disponível para este salão ainda.</p>
                   )}
                 </div>
               </div>
@@ -240,7 +237,7 @@ export default function SalonAppointmentPage() {
               <div className="space-y-6">
                  {selectedDate && currentProfessional && (
                   <div className="p-4 bg-muted rounded-lg text-center">
-                    <p className="font-semibold">Showing slots for <span className="text-primary">{format(selectedDate, 'MMMM d, yyyy')}</span> with <span className="text-primary">{currentProfessional.name}</span></p>
+                    <p className="font-semibold">Mostrando horários para <span className="text-primary">{format(selectedDate, 'd ')} de {format(selectedDate, 'MMMM')}</span> com <span className="text-primary">{currentProfessional.name}</span></p>
                   </div>
                 )}
                 <SlotPicker 
@@ -255,14 +252,14 @@ export default function SalonAppointmentPage() {
             {currentStep === 3 && (
               <div className="space-y-6 max-w-md mx-auto">
                 <CardHeader className="p-0 mb-4">
-                  <CardTitle className="font-headline text-2xl text-center">Your Details</CardTitle>
-                  <CardDescription className="text-center">Please provide your name and phone number.</CardDescription>
+                  <CardTitle className="font-headline text-2xl text-center">Seus Detalhes</CardTitle>
+                  <CardDescription className="text-center">Por favor, forneça seu nome e número de telefone.</CardDescription>
                 </CardHeader>
                 <div>
-                  <Label htmlFor="service" className="font-medium">Service</Label>
+                  <Label htmlFor="service" className="font-medium">Serviço</Label>
                   <Select value={selectedService} onValueChange={setSelectedService}>
                     <SelectTrigger id="service">
-                      <SelectValue placeholder="Select a service" />
+                      <SelectValue placeholder="Selecione um serviço" />
                     </SelectTrigger>
                     <SelectContent>
                       {services.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
@@ -270,50 +267,50 @@ export default function SalonAppointmentPage() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="clientName" className="font-medium">Full Name</Label>
+                  <Label htmlFor="clientName" className="font-medium">Nome Completo</Label>
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input id="clientName" type="text" placeholder="e.g., John Doe" value={clientName} onChange={(e) => setClientName(e.target.value)} className="pl-10" />
+                    <Input id="clientName" type="text" placeholder="Ex: João Silva" value={clientName} onChange={(e) => setClientName(e.target.value)} className="pl-10" />
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="clientPhone" className="font-medium">Phone Number</Label>
+                  <Label htmlFor="clientPhone" className="font-medium">Número de Telefone</Label>
                   <div className="relative">
                     <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input id="clientPhone" type="tel" placeholder="e.g., (555) 123-4567" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className="pl-10" />
+                    <Input id="clientPhone" type="tel" placeholder="Ex: (55) 12345-6789" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className="pl-10" />
                   </div>
                 </div>
-                 <div className="p-4 bg-muted rounded-lg space-y-1">
-                    <p className="font-semibold text-sm">Booking Summary:</p>
-                    {selectedDate && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><CalendarIconLucide size={14}/> {format(selectedDate, 'MMMM d, yyyy')}</p>}
-                    {selectedSlot && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Clock size={14}/> {format(new Date(selectedSlot.startTime), 'p')}</p>}
-                    {currentProfessional && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><User size={14}/> {currentProfessional.name}</p>}
-                    {selectedService && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Briefcase size={14}/> {selectedService}</p>}
+                   <div className="p-4 bg-muted rounded-lg space-y-1">
+                     <p className="font-semibold text-sm">Resumo do Agendamento:</p>
+                     {selectedDate && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><CalendarIconLucide size={14}/> {format(selectedDate, 'd ')} de {format(selectedDate, 'MMMM')}</p>}
+                     {selectedSlot && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Clock size={14}/> {format(new Date(selectedSlot.startTime), 'p')}</p>}
+                     {currentProfessional && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><User size={14}/> {currentProfessional.name}</p>}
+                     {selectedService && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Briefcase size={14}/> {selectedService}</p>}
                 </div>
               </div>
             )}
             
             {currentStep === 4 && confirmedAppointment && salon && currentProfessional && (
-               <div className="text-center py-10">
-                 <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                 <h2 className="text-3xl font-bold font-headline text-primary">Booking Submitted!</h2>
-                 <p className="text-muted-foreground mt-2">Your appointment request is sent. You will receive confirmation once approved.</p>
-                 <p className="mt-1 text-sm text-muted-foreground">
-                   Check the confirmation pop-up for WhatsApp sharing options.
-                 </p>
-                 <Button onClick={() => router.push('/')} className="mt-8">Back to Homepage</Button>
-               </div>
+                 <div className="text-center py-10">
+                   <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                   <h2 className="text-3xl font-bold font-headline text-primary">Agendamento Enviado!</h2>
+                   <p className="text-muted-foreground mt-2">Sua solicitação de agendamento foi enviada. Você receberá a confirmação assim que for aprovada.</p>
+                   <p className="mt-1 text-sm text-muted-foreground">
+                      Verifique o pop-up de confirmação para opções de compartilhamento via WhatsApp.
+                   </p>
+                   <Button onClick={() => router.push('/')} className="mt-8">Voltar para a Página Inicial</Button>
+                 </div>
             )}
 
             {currentStep < 4 && (
                 <div className="mt-10 flex justify-between items-center">
                     <Button variant="outline" onClick={handlePrevStep} disabled={currentStep === 1}>
-                    <ChevronLeft className="mr-2 h-4 w-4"/> Previous
+                    <ChevronLeft className="mr-2 h-4 w-4"/> Anterior
                     </Button>
-                    {currentStep < 3 && <Button onClick={handleNextStep} className="bg-primary hover:bg-primary/90">Next <ChevronRight className="ml-2 h-4 w-4"/></Button>}
+                    {currentStep < 3 && <Button onClick={handleNextStep} className="bg-primary hover:bg-primary/90">Próximo <ChevronRight className="ml-2 h-4 w-4"/></Button>}
                     {currentStep === 3 && <Button onClick={handleSubmitBooking} disabled={isConfirming} className="bg-accent hover:bg-accent/90">
                         {isConfirming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Confirm Booking
+                        Confirmar Agendamento
                     </Button>}
                 </div>
             )}
