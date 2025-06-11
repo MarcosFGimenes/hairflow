@@ -292,7 +292,7 @@ export default function SalonAppointmentPage() {
                     <p className="font-semibold text-sm">Resumo:</p>
                     <div className="text-sm text-muted-foreground space-y-1">
                       {selectedDate && <p className="flex items-center gap-1.5"><CalendarIconLucide size={14}/> {format(selectedDate, 'd/MM/yyyy')}</p>}
-                      {selectedSlot && <p className="flex items-center gap-1.5"><Clock size={14}/> {format(new Date(selectedSlot.startTime), 'p')}</p>}
+                      {selectedSlot && <p className="flex items-center gap-1.5"><Clock size={14}/> {format(new Date(selectedSlot.startTime), 'HH:mm')}</p>}
                       {currentProfessional && <p className="flex items-center gap-1.5"><User size={14}/> {currentProfessional.name}</p>}
                       {selectedService && <p className="flex items-center gap-1.5"><Briefcase size={14}/> {selectedService.name} (R$ {selectedService.price.toFixed(2)})</p>}
                     </div>
