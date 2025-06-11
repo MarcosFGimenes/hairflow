@@ -1,3 +1,5 @@
+// src/app/admin/professionals/new/page.tsx
+
 "use client";
 
 import React, { useState } from 'react';
@@ -8,31 +10,22 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { PageHeader } from '@/components/shared/PageHeader';
-import { UserPlus, Save, UploadCloud, Loader2 } from 'lucide-react';
-import Image from 'next/image';
-import { useAuth } from '@/contexts/AuthContext'; // Importar useAuth
-import { createProfessional } from '@/lib/firestoreService'; // Importar a nova função
-import { useToast } from "@/hooks/use-toast"; // Para notificações melhores
+import { UserPlus, Save, Loader2 } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from '@/contexts/AuthContext';
+import { createProfessional } from '@/lib/firestoreService';
+import { useToast } from "@/hooks/use-toast";
 
 export default function NewProfessionalPage() {
   const router = useRouter();
-  const { user } = useAuth(); // Obter o usuário logado
+  const { user } = useAuth();
   const { toast } = useToast();
   const [name, setName] = useState("");
   const [specialty, setSpecialty] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrl, setImageUrl] = useState<string | null>(null); // Estado para armazenar a URL da imagem
   const [isSaving, setIsSaving] = useState(false);
-
-  // A função handleImageUpload permanece a mesma
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      // setImageFile(file); // A lógica de upload de arquivo real seria necessária aqui
-      setImageUrl(URL.createObjectURL(file));
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,9 +44,11 @@ export default function NewProfessionalPage() {
       const professionalData = {
         name,
         specialty,
-        // Em um app real, você faria o upload da imagem para o Firebase Storage aqui
-        // e usaria a URL retornada. Por enquanto, usaremos o placeholder.
-        imageUrl: imageUrl || 'https://placehold.co/100x100.png',
+        // Usamos a URL do estado diretamente. Se estiver vazia, usamos um placeholder.
+        imageUrl: imageUrl || `https://ui-avatars.com/api/?name=${name.replace(/\s/g, '+')}&background=random`,
+        // Adicionando os campos de contato, se preenchidos
+        email: email || null,
+        phone: phone || null,
       };
 
       await createProfessional(user.uid, professionalData);
@@ -85,26 +80,25 @@ export default function NewProfessionalPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             
-            <div className="space-y-2 text-center">
-              <Label htmlFor="profile-image" className="block text-sm font-medium text-muted-foreground">Imagem de Perfil</Label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-border border-dashed rounded-md">
-                <div className="space-y-1 text-center">
-                  {imageUrl ? (
-                    <Image src={imageUrl} alt="Prévia do perfil" width={128} height={128} className="mx-auto h-32 w-32 rounded-full object-cover shadow-md" />
-                  ) : (
-                    <UploadCloud className="mx-auto h-12 w-12 text-muted-foreground" />
-                  )}
-                  <div className="flex text-sm text-muted-foreground justify-center">
-                    <label
-                      htmlFor="profile-image-upload"
-                      className="relative cursor-pointer rounded-md bg-background font-medium text-primary hover:text-accent focus-within:outline-none focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
-                    >
-                      <span>{imageUrl ? 'Alterar imagem' : 'Carregar uma imagem'}</span>
-                      <input id="profile-image-upload" name="profile-image-upload" type="file" className="sr-only" onChange={handleImageUpload} accept="image/*" />
-                    </label>
-                  </div>
-                  <p className="text-xs text-muted-foreground">PNG, JPG, GIF até 2MB</p>
-                </div>
+            {/* CAMPO DE IMAGEM ATUALIZADO PARA USAR URL */}
+            <div className="flex items-center gap-4 pt-2">
+              <Avatar className="h-24 w-24 rounded-lg shadow">
+                <AvatarImage src={imageUrl || ''} alt="Prévia do perfil" />
+                <AvatarFallback className="rounded-lg">
+                  <UserPlus className="h-10 w-10 text-muted-foreground" />
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex-grow space-y-1">
+                <Label htmlFor="prof-image-url">URL da Imagem de Perfil</Label>
+                <Input
+                    id="prof-image-url"
+                    type="url"
+                    value={imageUrl || ''}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    placeholder="https://exemplo.com/foto.png"
+                    disabled={isSaving}
+                />
+                <p className="text-xs text-muted-foreground">Cole a URL de uma imagem para o perfil.</p>
               </div>
             </div>
 
@@ -115,7 +109,7 @@ export default function NewProfessionalPage() {
 
             <div>
               <Label htmlFor="prof-specialty">Especialidade / Função</Label>
-              <Input id="prof-specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ex: Estilista Sênior, Especialista em Cores" disabled={isSaving}/>
+              <Input id="prof-specialty" value={specialty} onChange={(e) => setSpecialty(e.target.value)} placeholder="Ex: Estilista, Especialista em Cores" disabled={isSaving}/>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -125,7 +119,7 @@ export default function NewProfessionalPage() {
               </div>
               <div>
                 <Label htmlFor="prof-phone">Número de Telefone (Opcional)</Label>
-                <Input id="prof-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(55) 12345-6789" disabled={isSaving}/>
+                <Input id="prof-phone" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(XX) XXXXX-XXXX" disabled={isSaving}/>
               </div>
             </div>
             
@@ -133,7 +127,7 @@ export default function NewProfessionalPage() {
               <Link href="/admin/professionals">
                 <Button variant="outline" type="button" disabled={isSaving}>Cancelar</Button>
               </Link>
-              <Button type="submit" className="bg-primary hover:bg-primary/90" disabled={isSaving}>
+              <Button type="submit" disabled={isSaving}>
                 {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                 {isSaving ? 'Salvando...' : 'Salvar Profissional'}
               </Button>

@@ -1,4 +1,5 @@
 // src/app/agendar/[salonname]/page.tsx
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -22,8 +23,8 @@ import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 
 const steps = [
-  { id: 1, name: "Selecionar Data e Profissional" },
-  { id: 2, name: "Escolher Horário" },
+  { id: 1, name: "Data e Profissional" },
+  { id: 2, name: "Horário" },
   { id: 3, name: "Seus Detalhes" },
   { id: 4, name: "Confirmação" }
 ];
@@ -54,7 +55,6 @@ export default function SalonAppointmentPage() {
   const currentProfessional = useMemo(() => professionals.find(p => p.id === selectedProfessionalId), [professionals, selectedProfessionalId]);
   const selectedService = useMemo(() => salonServices.find(s => s.name === selectedServiceName), [salonServices, selectedServiceName]);
 
-
   useEffect(() => {
     if (salonSlug) {
       const fetchSalonAndData = async () => {
@@ -62,12 +62,14 @@ export default function SalonAppointmentPage() {
         const fetchedSalon = await getSalonBySlug(salonSlug);
         if (fetchedSalon) {
           setSalon(fetchedSalon);
-          const salonProfessionals = await getProfessionalsBySalon(fetchedSalon.id);
+          const [salonProfessionals, fetchedServices] = await Promise.all([
+            getProfessionalsBySalon(fetchedSalon.id),
+            getSalonServices(fetchedSalon.id)
+          ]);
           setProfessionals(salonProfessionals);
           if (salonProfessionals.length > 0) {
             setSelectedProfessionalId(salonProfessionals[0].id);
           }
-          const fetchedServices = await getSalonServices(fetchedSalon.id);
           setSalonServices(fetchedServices);
           if (fetchedServices.length > 0) {
             setSelectedServiceName(fetchedServices[0].name);
@@ -79,23 +81,20 @@ export default function SalonAppointmentPage() {
       };
       fetchSalonAndData();
     }
-  }, [salonSlug, router, toast]);
+  }, [salonSlug, toast]);
 
-  // Lógica para buscar slots disponíveis quando a data ou o profissional muda
   useEffect(() => {
     const fetchSlots = async () => {
-        if (selectedDate && selectedProfessionalId) {
-            setIsLoadingSlots(true);
-            // Pass a new Date object to ensure no mutation issues with previous states
-            const slots = await getAvailableSlotsForProfessional(selectedProfessionalId, new Date(selectedDate));
-            setAvailableSlots(slots);
-            setIsLoadingSlots(false);
-        } else {
-            setAvailableSlots([]);
-        }
-        setSelectedSlot(null); // Reseta o slot selecionado ao mudar o dia ou profissional
+      if (selectedDate && selectedProfessionalId) {
+        setIsLoadingSlots(true);
+        const slots = await getAvailableSlotsForProfessional(selectedProfessionalId, new Date(selectedDate));
+        setAvailableSlots(slots);
+        setIsLoadingSlots(false);
+      } else {
+        setAvailableSlots([]);
+      }
+      setSelectedSlot(null);
     };
-    
     fetchSlots();
   }, [selectedDate, selectedProfessionalId]);
 
@@ -107,44 +106,39 @@ export default function SalonAppointmentPage() {
         toast({ title: "Atenção", description: "Por favor, selecione um horário.", variant: "destructive" }); return;
     }
     if (currentStep === 3 && (!clientName || !clientPhone || !selectedServiceName)) {
-        toast({ title: "Atenção", description: "Por favor, preencha seu nome, telefone e selecione um serviço.", variant: "destructive" }); return;
+        toast({ title: "Atenção", description: "Preencha seu nome, telefone e selecione um serviço.", variant: "destructive" }); return;
     }
     if (currentStep < steps.length) {
         setCurrentStep(currentStep + 1);
     }
   };
-  const handlePrevStep = () => { if (currentStep > 1) setCurrentStep(currentStep -1);};
+  const handlePrevStep = () => { if (currentStep > 1) setCurrentStep(currentStep -1); };
 
   const handleSubmitBooking = async () => {
     if (!salon || !selectedProfessionalId || !selectedSlot || !clientName || !clientPhone || !selectedService || !currentProfessional) return;
-
     setIsConfirming(true);
-
     try {
-        const appointmentData = {
-            salonId: salon.id,
-            professionalId: selectedProfessionalId,
-            clientName,
-            clientPhone,
-            clientEmail: '', // Pode ser adicionado no formulário se desejar
-            serviceName: selectedService.name,
-            startTime: selectedSlot.startTime,
-            endTime: selectedSlot.endTime,
-            status: 'scheduled',
-            price: selectedService.price,
-        } as Omit<Appointment, 'id'>;
-
-        const newAppointment = await createAppointment(appointmentData);
-
-        setConfirmedAppointment(newAppointment);
-        setCurrentStep(4);
-        toast({ title: "Agendamento Enviado!", description: "Seu pedido de agendamento foi enviado com sucesso."});
-
+      const appointmentData = {
+        salonId: salon.id,
+        professionalId: selectedProfessionalId,
+        clientName,
+        clientPhone,
+        clientEmail: '',
+        serviceName: selectedService.name,
+        startTime: selectedSlot.startTime,
+        endTime: selectedSlot.endTime,
+        status: 'scheduled',
+        price: selectedService.price,
+      } as Omit<Appointment, 'id'>;
+      const newAppointment = await createAppointment(appointmentData);
+      setConfirmedAppointment(newAppointment);
+      setCurrentStep(4);
+      toast({ title: "Agendamento Enviado!", description: "Sua solicitação foi enviada com sucesso."});
     } catch(error) {
-        console.error("Booking error:", error);
-        toast({ title: "Erro no Agendamento", description: "Não foi possível criar seu agendamento. Tente novamente.", variant: "destructive" });
+      console.error("Booking error:", error);
+      toast({ title: "Erro no Agendamento", description: "Não foi possível criar seu agendamento.", variant: "destructive" });
     } finally {
-        setIsConfirming(false);
+      setIsConfirming(false);
     }
   };
 
@@ -152,7 +146,7 @@ export default function SalonAppointmentPage() {
     return (
       <>
         <GlobalHeader />
-        <main className="container mx-auto px-4 py-8 flex-grow text-center flex flex-col items-center justify-center">
+        <main className="container mx-auto px-4 py-8 flex-grow text-center flex flex-col items-center justify-center min-h-screen">
           <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
           <p className="text-lg text-muted-foreground">Carregando detalhes do salão...</p>
         </main>
@@ -165,9 +159,9 @@ export default function SalonAppointmentPage() {
     return (
       <>
         <GlobalHeader />
-        <main className="container mx-auto px-4 py-8 flex-grow text-center">
+        <main className="container mx-auto px-4 py-8 flex-grow text-center min-h-screen">
           <h1 className="text-3xl font-bold font-headline mb-4">Salão Não Encontrado</h1>
-          <p className="text-muted-foreground">O salão que você está procurando não existe ou a URL está incorreta.</p>
+          <p className="text-muted-foreground">O salão que você procura não existe ou a URL está incorreta.</p>
           <Button onClick={() => router.push('/')} className="mt-6">Ir para a Página Inicial</Button>
         </main>
         <GlobalFooter />
@@ -180,12 +174,24 @@ export default function SalonAppointmentPage() {
       <GlobalHeader />
       <main className="container mx-auto px-4 py-8 flex-grow">
         <Card className="max-w-4xl mx-auto shadow-2xl overflow-hidden">
-          <div className="relative h-48 md:h-64 bg-secondary">
-            <Image src={`https://placehold.co/1200x400.png`} alt={`Fachada de ${salon.name}`} layout="fill" objectFit="cover" data-ai-hint="fachada do salão"/>
-            <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4 text-center">
-              <h1 className="text-3xl md:text-5xl font-bold font-headline text-white mb-2">{salon.name}</h1>
-              {salon.address && <p className="text-lg text-gray-200">{salon.address}</p>}
-              {salon.description && <p className="text-sm text-gray-300 mt-2 max-w-xl">{salon.description}</p>}
+          {/* SEÇÃO DO CABEÇALHO ATUALIZADA */}
+          <div className="relative h-56 md:h-72 bg-secondary">
+            <Image 
+              src={salon.coverImageUrl || 'https://placehold.co/1200x400/000000/FFFFFF?text=Bem-vindo!'} 
+              alt={`Imagem de capa de ${salon.name}`} 
+              layout="fill" 
+              objectFit="cover" 
+              className="opacity-90"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent flex flex-col items-center justify-center p-4 text-center">
+              <Avatar className="h-24 w-24 mb-4 border-4 border-white/80 shadow-lg">
+                <AvatarImage src={salon.logoUrl || ''} alt={`Logo de ${salon.name}`} />
+                <AvatarFallback className="text-4xl bg-primary text-primary-foreground">
+                  {salon.name.substring(0, 1)}
+                </AvatarFallback>
+              </Avatar>
+              <h1 className="text-3xl md:text-5xl font-bold font-headline text-white drop-shadow-lg">{salon.name}</h1>
+              {salon.address && <p className="text-lg text-gray-200 mt-1 drop-shadow-md">{salon.address}</p>}
             </div>
           </div>
 
@@ -210,9 +216,9 @@ export default function SalonAppointmentPage() {
               <div className="space-y-8">
                 <BookingCalendar selectedDate={selectedDate} onDateSelect={setSelectedDate} />
                 <div>
-                  <Label htmlFor="professional" className="text-lg font-semibold mb-2 block text-center">Selecionar Profissional</Label>
+                  <Label className="text-lg font-semibold mb-4 block text-center">Selecionar Profissional</Label>
                   {professionals.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                       {professionals.map(prof => (
                         <Card 
                           key={prof.id} 
@@ -221,7 +227,7 @@ export default function SalonAppointmentPage() {
                         >
                           <div className="flex items-center gap-4">
                             <Avatar className="h-16 w-16">
-                              <AvatarImage src={prof.imageUrl || `https://placehold.co/100x100.png`} alt={prof.name} data-ai-hint="pessoa beleza" />
+                              <AvatarImage src={prof.imageUrl || ''} alt={prof.name} />
                               <AvatarFallback>{prof.name.substring(0,1)}</AvatarFallback>
                             </Avatar>
                             <div>
@@ -233,7 +239,7 @@ export default function SalonAppointmentPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-center text-muted-foreground">Nenhum profissional disponível para este salão ainda.</p>
+                    <p className="text-center text-muted-foreground">Nenhum profissional disponível.</p>
                   )}
                 </div>
               </div>
@@ -241,11 +247,11 @@ export default function SalonAppointmentPage() {
 
             {currentStep === 2 && (
               <div className="space-y-6">
-                 {selectedDate && currentProfessional && (
-                  <div className="p-4 bg-muted rounded-lg text-center">
-                    <p className="font-semibold">Mostrando horários para <span className="text-primary">{format(selectedDate, 'd ')} de {format(selectedDate, 'MMMM')}</span> com <span className="text-primary">{currentProfessional.name}</span></p>
-                  </div>
-                )}
+                  {selectedDate && currentProfessional && (
+                    <div className="p-4 bg-muted rounded-lg text-center">
+                      <p className="font-semibold">Horários para <span className="text-primary">{format(selectedDate, 'd/MM/yyyy')}</span> com <span className="text-primary">{currentProfessional.name}</span></p>
+                    </div>
+                  )}
                 <SlotPicker 
                   availableSlots={availableSlots} 
                   selectedSlot={selectedSlot} 
@@ -257,72 +263,62 @@ export default function SalonAppointmentPage() {
 
             {currentStep === 3 && (
               <div className="space-y-6 max-w-md mx-auto">
-                <CardHeader className="p-0 mb-4">
-                  <CardTitle className="font-headline text-2xl text-center">Seus Detalhes</CardTitle>
-                  <CardDescription className="text-center">Por favor, forneça seu nome e número de telefone.</CardDescription>
+                <CardHeader className="p-0 mb-4 text-center">
+                  <CardTitle className="font-headline text-2xl">Seus Detalhes</CardTitle>
+                  <CardDescription>Preencha seus dados para finalizar.</CardDescription>
                 </CardHeader>
                 <div>
                   <Label htmlFor="service" className="font-medium">Serviço</Label>
                   {salonServices.length > 0 ? (
                     <Select value={selectedServiceName} onValueChange={setSelectedServiceName}>
-                      <SelectTrigger id="service">
-                        <SelectValue placeholder="Selecione um serviço" />
-                      </SelectTrigger>
+                      <SelectTrigger id="service"><SelectValue placeholder="Selecione um serviço" /></SelectTrigger>
                       <SelectContent>
                         {salonServices.map(s => <SelectItem key={s.name} value={s.name}>{s.name} (R$ {s.price.toFixed(2)})</SelectItem>)}
                       </SelectContent>
                     </Select>
                   ) : (
-                    <p className="text-sm text-muted-foreground">Nenhum serviço cadastrado para este salão.</p>
+                    <p className="text-sm text-muted-foreground">Nenhum serviço cadastrado.</p>
                   )}
                 </div>
                 <div>
                   <Label htmlFor="clientName" className="font-medium">Nome Completo</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input id="clientName" type="text" placeholder="Ex: João Silva" value={clientName} onChange={(e) => setClientName(e.target.value)} className="pl-10" />
-                  </div>
+                  <div className="relative"><User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" /><Input id="clientName" type="text" placeholder="Seu nome" value={clientName} onChange={(e) => setClientName(e.target.value)} className="pl-10" /></div>
                 </div>
                 <div>
-                  <Label htmlFor="clientPhone" className="font-medium">Número de Telefone</Label>
-                  <div className="relative">
-                    <Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                    <Input id="clientPhone" type="tel" placeholder="Ex: (55) 12345-6789" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className="pl-10" />
-                  </div>
+                  <Label htmlFor="clientPhone" className="font-medium">Telefone (WhatsApp)</Label>
+                  <div className="relative"><Phone className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" /><Input id="clientPhone" type="tel" placeholder="(XX) XXXXX-XXXX" value={clientPhone} onChange={(e) => setClientPhone(e.target.value)} className="pl-10" /></div>
                 </div>
-                   <div className="p-4 bg-muted rounded-lg space-y-1">
-                     <p className="font-semibold text-sm">Resumo do Agendamento:</p>
-                     {selectedDate && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><CalendarIconLucide size={14}/> {format(selectedDate, 'd ')} de {format(selectedDate, 'MMMM')}</p>}
-                     {selectedSlot && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Clock size={14}/> {format(new Date(selectedSlot.startTime), 'p')}</p>}
-                     {currentProfessional && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><User size={14}/> {currentProfessional.name}</p>}
-                     {selectedService && <p className="text-xs text-muted-foreground flex items-center gap-1.5"><Briefcase size={14}/> {selectedService.name} (R$ {selectedService.price.toFixed(2)})</p>}
+                <div className="p-4 bg-muted rounded-lg space-y-2">
+                    <p className="font-semibold text-sm">Resumo:</p>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      {selectedDate && <p className="flex items-center gap-1.5"><CalendarIconLucide size={14}/> {format(selectedDate, 'd/MM/yyyy')}</p>}
+                      {selectedSlot && <p className="flex items-center gap-1.5"><Clock size={14}/> {format(new Date(selectedSlot.startTime), 'p')}</p>}
+                      {currentProfessional && <p className="flex items-center gap-1.5"><User size={14}/> {currentProfessional.name}</p>}
+                      {selectedService && <p className="flex items-center gap-1.5"><Briefcase size={14}/> {selectedService.name} (R$ {selectedService.price.toFixed(2)})</p>}
+                    </div>
                 </div>
               </div>
             )}
             
-            {currentStep === 4 && confirmedAppointment && salon && currentProfessional && (
-                 <div className="text-center py-10">
-                   <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-                   <h2 className="text-3xl font-bold font-headline text-primary">Agendamento Enviado!</h2>
-                   <p className="text-muted-foreground mt-2">Sua solicitação de agendamento foi enviada. Você receberá a confirmação assim que for aprovada.</p>
-                   <p className="mt-1 text-sm text-muted-foreground">
-                      Verifique o pop-up de confirmação para opções de compartilhamento via WhatsApp.
-                   </p>
-                   <Button onClick={() => router.push('/')} className="mt-8">Voltar para a Página Inicial</Button>
-                 </div>
+            {currentStep === 4 && confirmedAppointment && (
+              <div className="text-center py-10">
+                <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
+                <h2 className="text-3xl font-bold font-headline text-primary">Agendamento Enviado!</h2>
+                <p className="text-muted-foreground mt-2">Sua solicitação foi enviada e aguarda aprovação do salão.</p>
+                <p className="mt-1 text-sm text-muted-foreground">Você pode usar o pop-up para adicionar um lembrete ao seu calendário.</p>
+                <Button onClick={() => router.push('/')} className="mt-8">Voltar para a Página Inicial</Button>
+              </div>
             )}
 
             {currentStep < 4 && (
-                <div className="mt-10 flex justify-between items-center">
-                    <Button variant="outline" onClick={handlePrevStep} disabled={currentStep === 1}>
-                    <ChevronLeft className="mr-2 h-4 w-4"/> Anterior
-                    </Button>
-                    {currentStep < 3 && <Button onClick={handleNextStep} className="bg-primary hover:bg-primary/90">Próximo <ChevronRight className="ml-2 h-4 w-4"/></Button>}
-                    {currentStep === 3 && <Button onClick={handleSubmitBooking} disabled={isConfirming} className="bg-accent hover:bg-accent/90">
-                        {isConfirming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Confirmar Agendamento
-                    </Button>}
-                </div>
+              <div className="mt-10 flex justify-between items-center">
+                <Button variant="outline" onClick={handlePrevStep} disabled={currentStep === 1}><ChevronLeft className="mr-2 h-4 w-4"/> Anterior</Button>
+                {currentStep < 3 && <Button onClick={handleNextStep}>Próximo <ChevronRight className="ml-2 h-4 w-4"/></Button>}
+                {currentStep === 3 && <Button onClick={handleSubmitBooking} disabled={isConfirming} className="bg-green-600 hover:bg-green-700 text-white">
+                  {isConfirming && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Confirmar Agendamento
+                </Button>}
+              </div>
             )}
           </CardContent>
         </Card>

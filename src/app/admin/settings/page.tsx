@@ -1,3 +1,5 @@
+// src/app/admin/settings/page.tsx
+
 "use client";
 
 import React, { useEffect, useState } from 'react';
@@ -25,6 +27,7 @@ import type { Salon } from '@/lib/types';
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Save } from 'lucide-react';
 
+// Atualize o schema para incluir as URLs das imagens
 const salonSettingsSchema = z.object({
   name: z.string().min(3, "O nome do salão deve ter pelo menos 3 caracteres."),
   slug: z.string().min(3, "O slug da URL deve ter pelo menos 3 caracteres.").regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, "O slug pode conter apenas letras minúsculas, números e hífens."),
@@ -32,6 +35,9 @@ const salonSettingsSchema = z.object({
   address: z.string().optional(),
   description: z.string().max(500, "A descrição é muito longa.").optional(),
   email: z.string().email("Endereço de e-mail inválido.").optional(),
+  // Adicione os campos de imagem. `.or(z.literal(''))` permite que o campo seja vazio.
+  logoUrl: z.string().url("Por favor, insira uma URL válida para o logo.").optional().or(z.literal('')),
+  coverImageUrl: z.string().url("Por favor, insira uma URL válida para a imagem de capa.").optional().or(z.literal('')),
 });
 
 type SalonSettingsFormValues = z.infer<typeof salonSettingsSchema>;
@@ -39,7 +45,7 @@ type SalonSettingsFormValues = z.infer<typeof salonSettingsSchema>;
 export default function SettingsPage() {
   const { user, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true); // Para carregar dados do salão
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
   const form = useForm<SalonSettingsFormValues>({
@@ -51,6 +57,8 @@ export default function SettingsPage() {
       address: "",
       description: "",
       email: "",
+      logoUrl: "",
+      coverImageUrl: "",
     },
   });
 
@@ -67,34 +75,34 @@ export default function SettingsPage() {
             address: salonData.address || "",
             description: salonData.description || "",
             email: salonData.email || "",
+            logoUrl: salonData.logoUrl || "",
+            coverImageUrl: salonData.coverImageUrl || "",
           });
         } else {
-          toast({ title: "Erro", description: "Não foi possível carregar os dados do salão. Pode ser que ainda não exista.", variant: "destructive" });
+          toast({ title: "Erro", description: "Não foi possível carregar os dados do salão.", variant: "destructive" });
         }
         setIsLoading(false);
       };
       fetchSalonData();
     } else if (!authLoading) {
-        setIsLoading(false);
+      setIsLoading(false);
     }
   }, [user, authLoading, form, toast]);
 
   const onSubmit = async (data: SalonSettingsFormValues) => {
     if (!user) {
-      toast({ title: "Erro", description: "Você precisa estar logado para salvar as configurações.", variant: "destructive" });
+      toast({ title: "Erro", description: "Você precisa estar logado para salvar.", variant: "destructive" });
       return;
     }
     setIsSaving(true);
     try {
-      const { slug, ...updateData } = data; // O slug é derivado do nome em firestoreService se o nome mudar
-      await updateSalonSettings(user.uid, updateData);
-      toast({ title: "Sucesso", description: "Configurações do salão atualizadas com sucesso!" });
+      await updateSalonSettings(user.uid, data);
+      toast({ title: "Sucesso", description: "Configurações atualizadas com sucesso!" });
       const updatedSalon = await getSalonByAdmin(user.uid);
-      if (updatedSalon) form.reset(updatedSalon);
-
+      if (updatedSalon) form.reset(updatedSalon as SalonSettingsFormValues);
     } catch (error) {
-      console.error("Erro ao atualizar as configurações do salão:", error);
-      toast({ title: "Erro", description: "Falha ao atualizar as configurações do salão.", variant: "destructive" });
+      console.error("Erro ao atualizar as configurações:", error);
+      toast({ title: "Erro", description: "Falha ao atualizar as configurações.", variant: "destructive" });
     } finally {
       setIsSaving(false);
     }
@@ -113,87 +121,57 @@ export default function SettingsPage() {
     <>
       <PageHeader 
         title="Configurações do Salão"
-        description="Gerencie as informações públicas e as configurações operacionais do seu salão."
+        description="Gerencie as informações públicas e a identidade visual do seu salão."
       />
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           <Card className="shadow-lg">
             <CardHeader>
               <CardTitle className="font-headline">Informações Básicas</CardTitle>
-              <CardDescription>Esta informação será exibida na página pública de agendamentos do seu salão.</CardDescription>
+              <CardDescription>Esta informação será exibida na página pública de agendamentos.</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Nome do Salão</FormLabel>
-                    <FormControl><Input placeholder="Nome do seu salão" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="slug"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Slug da URL Personalizada</FormLabel>
-                    <FormControl><Input placeholder="nome-do-seu-salao" {...field} disabled /></FormControl>
-                    <FormDescription>
-                      Isso fará parte da URL de agendamento do seu salão: hairflow.com/agendar/{form.getValues().slug || "nome-do-seu-salao"}. 
-                      É gerado automaticamente a partir do nome do seu salão.
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-               <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>E-mail de Contato</FormLabel>
-                    <FormControl><Input type="email" placeholder="contato@seusalão.com" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="contactNumber"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Número de Telefone para Contato</FormLabel>
-                    <FormControl><Input type="tel" placeholder="+55 (XX) XXXXX-XXXX" {...field} /></FormControl>
-                    <FormDescription>Usado para confirmações de agendamento via WhatsApp e contato com o cliente.</FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="address"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Endereço do Salão</FormLabel>
-                    <FormControl><Input placeholder="Rua Principal, 123, Cidade, País" {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Descrição do Salão (Opcional)</FormLabel>
-                    <FormControl><Textarea placeholder="Conte aos clientes um pouco sobre seu salão..." {...field} rows={4} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Campos existentes (Nome, Slug, Email, etc.) */}
+              <FormField control={form.control} name="name" render={({ field }) => ( <FormItem> <FormLabel>Nome do Salão</FormLabel> <FormControl><Input placeholder="Nome do seu salão" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="slug" render={({ field }) => ( <FormItem> <FormLabel>Slug da URL Personalizada</FormLabel> <FormControl><Input placeholder="nome-do-seu-salao" {...field} disabled /></FormControl> <FormDescription>URL: hairflow.com/agendar/{form.getValues().slug || "seu-slug"}. É gerado a partir do nome.</FormDescription> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="email" render={({ field }) => ( <FormItem> <FormLabel>E-mail de Contato</FormLabel> <FormControl><Input type="email" placeholder="contato@seusalão.com" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="contactNumber" render={({ field }) => ( <FormItem> <FormLabel>Número de Telefone</FormLabel> <FormControl><Input type="tel" placeholder="+55 (XX) XXXXX-XXXX" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="address" render={({ field }) => ( <FormItem> <FormLabel>Endereço do Salão</FormLabel> <FormControl><Input placeholder="Rua Principal, 123, Cidade" {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+              <FormField control={form.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Descrição do Salão</FormLabel> <FormControl><Textarea placeholder="Conte aos clientes um pouco sobre seu salão..." {...field} rows={4} /></FormControl> <FormMessage /> </FormItem> )}/>
+            </CardContent>
+          </Card>
+
+          {/* NOVO CARD PARA IMAGENS */}
+          <Card className="shadow-lg">
+            <CardHeader>
+                <CardTitle className="font-headline">Identidade Visual</CardTitle>
+                <CardDescription>Personalize a página do seu salão com um logo e uma imagem de capa.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+                <FormField
+                    control={form.control}
+                    name="logoUrl"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>URL do Logo</FormLabel>
+                            <FormControl><Input type="url" placeholder="https://exemplo.com/logo.png" {...field} /></FormControl>
+                            <FormDescription>O logo aparecerá no topo da sua página de agendamento.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
+                <FormField
+                    control={form.control}
+                    name="coverImageUrl"
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>URL da Imagem de Capa</FormLabel>
+                            <FormControl><Input type="url" placeholder="https://exemplo.com/capa.jpg" {...field} /></FormControl>
+                            <FormDescription>Esta imagem será usada como banner principal na sua página de agendamento.</FormDescription>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                />
             </CardContent>
           </Card>
 

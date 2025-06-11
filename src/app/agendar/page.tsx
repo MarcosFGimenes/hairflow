@@ -1,4 +1,4 @@
-// src/app/appointments/page.tsx
+// src/app/agendar/page.tsx
 
 "use client";
 
@@ -12,7 +12,7 @@ import { useRouter } from 'next/navigation';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Search, Loader2 } from 'lucide-react';
 import Image from 'next/image';
-import { getAllSalons } from '@/lib/firestoreService'; // Importa a nova função
+import { getAllSalons } from '@/lib/firestoreService';
 import type { Salon } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 
@@ -24,7 +24,6 @@ export default function AppointmentsLandingPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Busca os salões do Firestore ao carregar a página
   useEffect(() => {
     const fetchSalons = async () => {
       setIsLoading(true);
@@ -35,7 +34,7 @@ export default function AppointmentsLandingPage() {
         console.error("Failed to fetch salons:", error);
         toast({
           title: "Erro",
-          description: "Não foi possível carregar a lista de salões. Por favor, tente novamente mais tarde.",
+          description: "Não foi possível carregar a lista de salões. Tente novamente mais tarde.",
           variant: "destructive",
         });
       } finally {
@@ -45,7 +44,6 @@ export default function AppointmentsLandingPage() {
     fetchSalons();
   }, [toast]);
   
-  // Filtra os salões com base na busca do usuário
   const filteredSalons = useMemo(() => {
     if (!searchQuery) return allSalons;
     return allSalons.filter(salon =>
@@ -54,17 +52,12 @@ export default function AppointmentsLandingPage() {
     );
   }, [searchQuery, allSalons]);
 
-
-  // A função de busca agora só precisa do slug, não precisa mais pesquisar na lista
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-        // A lista de salões já está sendo filtrada em tempo real,
-        // então o botão de busca pode ser usado para uma lógica mais avançada no futuro,
-        // como buscar por geolocalização. Por enquanto, a lista se atualiza ao digitar.
-        toast({ title: "Busca", description: `Exibindo salões que correspondem a "${searchQuery}"`});
+      toast({ title: "Busca", description: `Exibindo salões que correspondem a "${searchQuery}"`});
     } else {
-        toast({ title: "Info", description: "Mostrando todos os salões disponíveis."});
+      toast({ title: "Info", description: "Mostrando todos os salões disponíveis."});
     }
   };
 
@@ -112,11 +105,11 @@ export default function AppointmentsLandingPage() {
                         <Card key={salon.id} className="overflow-hidden shadow-lg hover:shadow-2xl transition-shadow duration-300">
                             <div className="relative h-48 w-full">
                                 <Image 
-                                    src={`https://placehold.co/400x240.png`}
-                                    alt={`Exterior de ${salon.name}`} 
+                                    // A MUDANÇA ESTÁ AQUI
+                                    src={salon.coverImageUrl || 'https://placehold.co/400x240/a3e635/000000?text=Salão'}
+                                    alt={`Imagem de capa de ${salon.name}`} 
                                     layout="fill" 
                                     objectFit="cover"
-                                    data-ai-hint="prédio do salão"
                                 />
                             </div>
                             <CardHeader>

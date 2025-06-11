@@ -3,11 +3,14 @@ export interface Salon {
   id: string; // This will often be the adminUserId or a Firestore-generated ID
   name: string;
   slug: string; // For hairflow.com/appointments/[slug]
-  contactNumber: string; // For WhatsApp link
+  adminId: string; // ID of the Firebase user who owns this salon
+  contactNumber?: string; // For WhatsApp link
   address?: string;
-  adminUserId: string; // ID of the Firebase user who owns this salon
   description?: string; // New field for salon description
   email?: string; // Contact email for the salon
+  themeColors?: { [key: string]: string }; // NEW: Object for theme colors
+  logoUrl?: string; // URL for the salon's logo
+  coverImageUrl?: string; // URL for the cover image
   services?: Service[]; // NEW: Array of services offered by the salon
 }
 
