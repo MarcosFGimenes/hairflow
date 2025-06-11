@@ -41,7 +41,7 @@ export function ConfirmationDialog({
   const service = appointmentDetails.serviceName;
   const professionalName = professionalDetails.name;
   const salonName = salonDetails.name;
-  const salonContact = salonDetails.contactNumber; // Make sure this is in E.164 format for WhatsApp, e.g., +15551234567
+  const salonContact = salonDetails.contactNumber ?? ""; // Make sure this is in E.164 format for WhatsApp, e.g., +15551234567
   const clientName = appointmentDetails.clientName;
 
   const confirmationMessage = 
