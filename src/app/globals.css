@@ -20,13 +20,13 @@ body {
     --secondary: 167.23 60% 75%;
     --secondary-foreground: 167.23 30% 20%;
     --muted: 167.23 60% 83%;
-    --muted-foreground: 167.23 30% 35%;
+    --muted-foreground: 167.23 30% 35%; /* Cor do placeholder, ajuste aqui se quiser mais contraste */
     --accent: 348 62% 48%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 167.23 50% 70%;
-    --input: 167.23 60% 94%;
+    --input: 0 0% 100%; /* Branco puro para inputs */
     --ring: 167.23 50% 50%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
