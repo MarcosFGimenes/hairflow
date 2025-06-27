@@ -13,7 +13,7 @@ import {
 import { Button } from "@/components/ui/button";
 import type { Appointment, Salon, Professional } from "@/lib/types";
 import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale'; // Importa o locale ptBR
+import { ptBR } from 'date-fns/locale';
 import { Share2, Copy, CheckCircle } from 'lucide-react';
 import React from "react";
 
@@ -35,10 +35,9 @@ export function ConfirmationDialog({
   const [copied, setCopied] = React.useState(false);
 
   if (!appointmentDetails || !salonDetails || !professionalDetails) {
-    return null; // Ou algum estado de carregamento/erro
+    return null;
   }
 
-  // Formato de data em português
   const appointmentTime = format(new Date(appointmentDetails.startTime), "EEEE, dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR });
   const service = appointmentDetails.serviceName;
   const professionalName = professionalDetails.name;
@@ -46,7 +45,6 @@ export function ConfirmationDialog({
   const salonContact = salonDetails.contactNumber ?? "";
   const clientName = appointmentDetails.clientName;
 
-  // Mensagem de confirmação em português
   const confirmationMessage = 
 `Olá ${salonName}! Esta é uma confirmação do agendamento de ${clientName}:
 Serviço: ${service}
@@ -67,36 +65,43 @@ Até breve! - Hairflow Booking`;
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
-      <AlertDialogContent className="max-w-lg">
-        <AlertDialogHeader>
+      <AlertDialogContent className="max-w-lg border-0 shadow-lg bg-white/80 backdrop-blur-sm rounded-2xl">
+        <AlertDialogHeader className="p-6 pb-0">
           <div className="flex justify-center mb-4">
-            <CheckCircle className="h-16 w-16 text-green-500" />
+            <CheckCircle className="h-16 w-16 text-teal-500" />
           </div>
-          <AlertDialogTitle className="text-2xl font-headline text-center">Agendamento Confirmado!</AlertDialogTitle>
-          <AlertDialogDescription className="text-center text-muted-foreground text-md">
-            Seu agendamento para <span className="font-semibold text-foreground">{service}</span> com <span className="font-semibold text-foreground">{professionalName}</span> no <span className="font-semibold text-foreground">{salonName}</span> foi confirmado.
+          <AlertDialogTitle className="text-2xl font-semibold text-slate-900 text-center">Agendamento Confirmado!</AlertDialogTitle>
+          <AlertDialogDescription className="text-center text-slate-500 text-md">
+            Seu agendamento para <span className="font-semibold text-slate-900">{service}</span> com <span className="font-semibold text-slate-900">{professionalName}</span> no <span className="font-semibold text-slate-900">{salonName}</span> foi confirmado.
           </AlertDialogDescription>
         </AlertDialogHeader>
         
-        <div className="my-6 space-y-3 p-4 bg-muted/50 rounded-lg border">
-            <p><strong className="font-medium text-foreground">Cliente:</strong> {clientName}</p>
-            <p><strong className="font-medium text-foreground">Data & Horário:</strong> {appointmentTime}</p>
-            <p><strong className="font-medium text-foreground">Serviço:</strong> {service}</p>
-            <p><strong className="font-medium text-foreground">Profissional:</strong> {professionalName}</p>
-            {salonDetails.address && <p><strong className="font-medium text-foreground">Local:</strong> {salonDetails.address}</p>}
+        <div className="my-6 space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <p><strong className="font-medium text-slate-900">Cliente:</strong> {clientName}</p>
+            <p><strong className="font-medium text-slate-900">Data & Horário:</strong> {appointmentTime}</p>
+            <p><strong className="font-medium text-slate-900">Serviço:</strong> {service}</p>
+            <p><strong className="font-medium text-slate-900">Profissional:</strong> {professionalName}</p>
+            {salonDetails.address && <p><strong className="font-medium text-slate-900">Local:</strong> {salonDetails.address}</p>}
         </div>
 
-        <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
-          <Button variant="outline" onClick={handleCopyToClipboard} className="w-full sm:w-auto">
-            {copied ? <CheckCircle className="mr-2 h-4 w-4 text-green-500" /> : <Copy className="mr-2 h-4 w-4" />}
+        <AlertDialogFooter className="flex flex-col sm:flex-row gap-2 p-6 pt-0">
+          <Button 
+            variant="outline" 
+            onClick={handleCopyToClipboard} 
+            className="w-full sm:w-auto border-slate-200 hover:bg-slate-100 text-slate-900"
+          >
+            {copied ? <CheckCircle className="mr-2 h-4 w-4 text-teal-500" /> : <Copy className="mr-2 h-4 w-4 text-slate-500" />}
             {copied ? "Copiado!" : "Copiar detalhes"}
           </Button>
           <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
-            <Button className="w-full bg-[#25D366] hover:bg-[#1DAE50] text-white">
+            <Button className="w-full bg-teal-500 hover:bg-teal-600 text-white">
               <Share2 className="mr-2 h-4 w-4" /> Compartilhar no WhatsApp
             </Button>
           </a>
-          <AlertDialogAction onClick={() => onOpenChange(false)} className="w-full sm:w-auto bg-primary hover:bg-primary/90">
+          <AlertDialogAction 
+            onClick={() => onOpenChange(false)} 
+            className="w-full sm:w-auto bg-teal-500 hover:bg-teal-600 text-white"
+          >
             Concluir
           </AlertDialogAction>
         </AlertDialogFooter>
@@ -104,4 +109,3 @@ Até breve! - Hairflow Booking`;
     </AlertDialog>
   );
 }
-

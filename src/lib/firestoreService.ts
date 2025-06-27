@@ -1,8 +1,11 @@
 // src/lib/firestoreService.ts
 import { db } from '@/lib/firebase';
-import { doc, setDoc, getDoc, updateDoc, collection, query, where, getDocs, limit, addDoc, orderBy, deleteDoc } from 'firebase/firestore';
-import { getDay, format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns'; // Adicionado date-fns
-import type { Appointment, TimeSlot, Salon, Professional, Service } from '@/lib/types';
+import { 
+  doc, setDoc, getDoc, updateDoc, collection, query, where, 
+  getDocs, limit, addDoc, orderBy, deleteDoc, serverTimestamp 
+} from 'firebase/firestore';
+import { getDay, format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import type { Appointment, TimeSlot, Salon, Professional, Service, Customer } from '@/lib/types';
 
 // Function to create a URL-friendly slug
 const generateSlug = (name: string): string => {
@@ -15,8 +18,7 @@ const generateSlug = (name: string): string => {
     .replace(/-+$/, ''); // Trim - from end of text
 };
 
-// Creates a new salon document in Firestore.
-// Uses adminUserId as the document ID for simplicity.
+// Creates a new salon document in Firestore
 export const createSalon = async (
   adminUserId: string,
   salonName: string,
@@ -29,163 +31,120 @@ export const createSalon = async (
   const salonRef = doc(db, 'salons', adminUserId);
   const newSalon: Salon = {
     id: adminUserId,
-    adminUserId,
+
     name: salonName,
     slug: salonSlug,
-    email: email,
-    contactNumber: contactNumber,
-    address: address || "", 
+    email,
+    contactNumber,
+    address: address || "",
     description: description || "",
     services: [],
+    adminId: ''
   };
   await setDoc(salonRef, newSalon);
-  console.log(`Salon created for user ${adminUserId} with slug ${salonSlug} and details:`, newSalon);
   return salonSlug;
 };
 
-// Fetches salon data for a given admin user ID.
+// Fetches salon data for a given admin user ID
 export const getSalonByAdmin = async (adminUserId: string): Promise<Salon | null> => {
   if (!adminUserId) return null;
   const salonRef = doc(db, 'salons', adminUserId);
   const salonSnap = await getDoc(salonRef);
-  if (salonSnap.exists()) {
-    return salonSnap.data() as Salon;
-  }
-  console.warn(`No salon found for admin user ID: ${adminUserId}`);
-  return null;
+  return salonSnap.exists() ? salonSnap.data() as Salon : null;
 };
 
-// Updates salon settings.
+// Updates salon settings
 export const updateSalonSettings = async (
   adminUserId: string,
   data: Partial<Omit<Salon, 'id' | 'adminUserId'>>
 ): Promise<void> => {
   const salonRef = doc(db, 'salons', adminUserId);
-  
   const currentSalonSnap = await getDoc(salonRef);
+  
   if (!currentSalonSnap.exists()) {
-    console.error(`Salon with ID ${adminUserId} not found for update.`);
     throw new Error("Salon not found for update.");
   }
-  const currentSalonData = currentSalonSnap.data() as Salon;
 
   const updateData = { ...data };
-  if (data.name && data.name !== currentSalonData.name) {
+  if (data.name && data.name !== (currentSalonSnap.data() as Salon).name) {
     updateData.slug = generateSlug(data.name);
   }
+  
   await updateDoc(salonRef, updateData);
-  console.log(`Salon settings updated for admin user ID: ${adminUserId}`);
 };
 
-// Adds or updates a service for a salon
+// Adds or updates services for a salon
 export const saveSalonServices = async (salonId: string, services: Service[]): Promise<void> => {
   const salonRef = doc(db, 'salons', salonId);
-  await updateDoc(salonRef, {
-    services: services,
-  });
-  console.log(`Services updated for salon ${salonId}`);
+  await updateDoc(salonRef, { services });
 };
 
 // Gets services for a salon
 export const getSalonServices = async (salonId: string): Promise<Service[]> => {
   const salonRef = doc(db, 'salons', salonId);
   const salonSnap = await getDoc(salonRef);
-  if (salonSnap.exists()) {
-    const data = salonSnap.data();
-    return (data.services || []) as Service[];
-  }
-  return [];
+  return salonSnap.exists() ? (salonSnap.data().services || []) as Service[] : [];
 };
 
-// Fetches salon data by its slug.
+// Fetches salon data by its slug
 export const getSalonBySlug = async (slug: string): Promise<Salon | null> => {
   if (!slug) return null;
-  const salonsCollectionRef = collection(db, 'salons');
-  const q = query(salonsCollectionRef, where('slug', '==', slug), limit(1));
+  const q = query(collection(db, 'salons'), where('slug', '==', slug), limit(1));
   const querySnapshot = await getDocs(q);
-  if (!querySnapshot.empty) {
-    const salonDoc = querySnapshot.docs[0];
-    return { id: salonDoc.id, ...salonDoc.data() } as Salon;
-  }
-  console.warn(`No salon found with slug: ${slug}`);
-  return null;
+  return querySnapshot.empty ? null : { id: querySnapshot.docs[0].id, ...querySnapshot.docs[0].data() } as Salon;
 };
 
-// Creates a new professional document in Firestore.
+// Creates a new professional
 export const createProfessional = async (
   salonId: string,
   professionalData: Omit<Professional, 'id' | 'salonId'>
 ): Promise<string> => {
-  const professionalsCollectionRef = collection(db, 'professionals');
-  const newProfessionalDoc = await addDoc(professionalsCollectionRef, {
+  const docRef = await addDoc(collection(db, 'professionals'), {
     ...professionalData,
-    salonId: salonId,
+    salonId,
   });
-  console.log(`Professional created with ID: ${newProfessionalDoc.id} for salon ${salonId}`);
-  return newProfessionalDoc.id;
+  return docRef.id;
 };
 
-// Fetches professionals for a given salon ID.
+// Fetches professionals for a salon
 export const getProfessionalsBySalon = async (salonId: string): Promise<Professional[]> => {
   if (!salonId) return [];
-  
-  const professionalsCollectionRef = collection(db, 'professionals');
-  const q = query(professionalsCollectionRef, where('salonId', '==', salonId));
-  
-  const querySnapshot = await getDocs(q);
-  if (querySnapshot.empty) {
-    console.log(`No professionals found for salon ID: ${salonId}`);
-    return [];
-  }
-  
-  const professionals: Professional[] = querySnapshot.docs.map(doc => ({
-    id: doc.id,
-    ...doc.data()
-  } as Professional));
-  
-  return professionals;
+  const q = query(collection(db, 'professionals'), where('salonId', '==', salonId));
+  const snapshot = await getDocs(q);
+  return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Professional));
 };
 
-// Salva a disponibilidade recorrente de um profissional
+// Saves recurring availability for a professional
 export const saveRecurringAvailability = async (
   professionalId: string,
   availability: any
 ): Promise<void> => {
-  const profRef = doc(db, 'professionals', professionalId);
-  await updateDoc(profRef, {
+  await updateDoc(doc(db, 'professionals', professionalId), {
     recurringAvailability: availability,
   });
-  console.log(`Recurring availability updated for professional ${professionalId}`);
 };
 
-// Salva as exceções de data (disponível/indisponível)
+// Saves date overrides for a professional
 export const saveDateOverrides = async (
   professionalId: string,
   overrides: any[]
 ): Promise<void> => {
-  const profRef = doc(db, 'professionals', professionalId);
-  await updateDoc(profRef, {
+  await updateDoc(doc(db, 'professionals', professionalId), {
     dateOverrides: overrides,
   });
-  console.log(`Date overrides updated for professional ${professionalId}`);
 };
 
-// Busca a configuração de disponibilidade completa de um profissional
+// Gets professional availability
 export const getProfessionalAvailability = async (professionalId: string) => {
   if (!professionalId) return null;
-  const profRef = doc(db, 'professionals', professionalId);
-  const profSnap = await getDoc(profRef);
-  if (profSnap.exists()) {
-    const data = profSnap.data();
-    return {
-      recurringAvailability: data.recurringAvailability || {},
-      dateOverrides: data.dateOverrides || [],
-    };
-  }
-  return null;
+  const snap = await getDoc(doc(db, 'professionals', professionalId));
+  return snap.exists() ? {
+    recurringAvailability: snap.data().recurringAvailability || {},
+    dateOverrides: snap.data().dateOverrides || [],
+  } : null;
 };
 
-// Função para gerar slots de 30 minutos entre duas horas
+// Generates time slots between two times
 const generateTimeSlots = (start: string, end: string, date: Date, duration = 30): Date[] => {
   const slots = [];
   const [startHour, startMinute] = start.split(':').map(Number);
@@ -197,39 +156,36 @@ const generateTimeSlots = (start: string, end: string, date: Date, duration = 30
   const endTime = new Date(date);
   endTime.setHours(endHour, endMinute, 0, 0);
 
-  // Ajuste para evitar que o último slot ultrapasse a hora final
-  // Se o endTime for 17:00 e o duration for 30, o último slot deve começar no máximo às 16:30
   const maxStartTime = new Date(endTime);
   maxStartTime.setMinutes(endTime.getMinutes() - duration);
 
-  while (currentTime.getTime() <= maxStartTime.getTime()) { // Changed condition to <=
+  while (currentTime.getTime() <= maxStartTime.getTime()) {
     slots.push(new Date(currentTime));
     currentTime.setMinutes(currentTime.getMinutes() + duration);
   }
   return slots;
 }
 
-export const getAvailableSlotsForProfessional = async (professionalId: string, selectedDate: Date): Promise<TimeSlot[]> => {
+// Gets available time slots for a professional
+export const getAvailableSlotsForProfessional = async (
+  professionalId: string, 
+  selectedDate: Date, 
+  duration: number
+): Promise<TimeSlot[]> => {
   if (!professionalId || !selectedDate) return [];
 
-  const profRef = doc(db, 'professionals', professionalId);
-  const profSnap = await getDoc(profRef);
-
-  if (!profSnap.exists()) {
-    console.warn("Professional not found:", professionalId);
-    return [];
-  }
+  const profSnap = await getDoc(doc(db, 'professionals', professionalId));
+  if (!profSnap.exists()) return [];
 
   const professionalData = profSnap.data();
-  const dayOfWeekIndex = selectedDate.getDay(); // 0 for Sunday, 1 for Monday, ..., 6 for Saturday
+  const dayOfWeekIndex = selectedDate.getDay();
   const dayNames = ['Domingo', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado'];
-  const dayOfWeek = dayNames[dayOfWeekIndex]; // Get the day name in Portuguese
+  const dayOfWeek = dayNames[dayOfWeekIndex];
 
   let workHours = professionalData.recurringAvailability?.[dayOfWeek];
 
-  // Verificar exceções (overrides)
-  const dateOverrides = professionalData.dateOverrides || [];
-  const override = dateOverrides.find((o: any) => {
+  // Check for date overrides
+  const override = (professionalData.dateOverrides || []).find((o: any) => {
     const overrideDate = o.date?.seconds
       ? new Date(o.date.seconds * 1000)
       : (typeof o.date === 'string' ? new Date(o.date) : undefined);
@@ -237,100 +193,68 @@ export const getAvailableSlotsForProfessional = async (professionalId: string, s
   });
 
   if (override) {
-    if (override.type === 'unavailable') {
-      return []; // Dia bloqueado
-    }
+    if (override.type === 'unavailable') return [];
     workHours = { isOpen: true, startTime: override.startTime, endTime: override.endTime };
   }
   
-  if (!workHours || !workHours.isOpen) {
-    return []; // Não trabalha neste dia
-  }
+  if (!workHours || !workHours.isOpen) return [];
 
-  // Gerar todos os slots possíveis para o dia
+  // Generate all possible slots
   const allPossibleSlots = generateTimeSlots(workHours.startTime, workHours.endTime, selectedDate);
 
-  // Buscar agendamentos existentes para filtrar
-  const startOfSelectedDay = startOfDay(selectedDate);
-  const endOfSelectedDay = endOfDay(selectedDate);
-
+  // Get booked appointments
   const appointmentsQuery = query(
     collection(db, 'appointments'),
     where('professionalId', '==', professionalId),
-    where('startTime', '>=', startOfSelectedDay),
-    where('startTime', '<=', endOfSelectedDay),
-    // Consider only 'scheduled' and 'confirmed' appointments as booked
-    where('status', 'in', ['scheduled', 'confirmed']) // NEW: Filter by relevant statuses
+    where('startTime', '>=', startOfDay(selectedDate)),
+    where('startTime', '<=', endOfDay(selectedDate)),
+    where('status', 'in', ['scheduled', 'confirmed'])
   );
   
-  const appointmentsSnapshot = await getDocs(appointmentsQuery);
-  const bookedSlots = appointmentsSnapshot.docs.map(doc => {
+  const bookedSlots = (await getDocs(appointmentsQuery)).docs.map(doc => {
     const data = doc.data();
-    // Ensure startTime and endTime are Date objects for accurate comparison
-    const apptStartTime = data.startTime?.toDate ? data.startTime.toDate() : new Date(data.startTime);
-    const apptEndTime = data.endTime?.toDate ? data.endTime.toDate() : new Date(data.endTime);
-    return { startTime: apptStartTime.getTime(), endTime: apptEndTime.getTime() };
+    return {
+      startTime: data.startTime?.toDate?.()?.getTime() || new Date(data.startTime).getTime(),
+      endTime: data.endTime?.toDate?.()?.getTime() || new Date(data.endTime).getTime()
+    };
   });
 
-  // Filtrar slots já agendados
-  const availableTimeSlots: TimeSlot[] = allPossibleSlots
+  // Filter available slots
+  return allPossibleSlots
     .filter(slotTime => {
       const slotEndTime = new Date(slotTime);
-      slotEndTime.setMinutes(slotEndTime.getMinutes() + 30); // Assuming 30min duration for a slot
-      
-      // Check if this slot overlaps with any booked appointment
-      return !bookedSlots.some(bookedAppt => {
-        // Check for overlap: (start1 < end2) && (end1 > start2)
-        return (slotTime.getTime() < bookedAppt.endTime) && (slotEndTime.getTime() > bookedAppt.startTime);
-      });
+      slotEndTime.setMinutes(slotEndTime.getMinutes() + 30);
+      return !bookedSlots.some(
+        booked => slotTime.getTime() < booked.endTime && slotEndTime.getTime() > booked.startTime
+      );
     })
-    .map((slotTime, index) => {
-      const endTime = new Date(slotTime);
-      endTime.setMinutes(endTime.getMinutes() + 30); // Assumindo duração de 30min
-      return {
-        id: `slot-${index}-${slotTime.getTime()}`,
-        professionalId,
-        salonId: professionalData.salonId,
-        startTime: slotTime,
-        endTime: endTime,
-        isBooked: false, // Mark as false because it's available after filtering
-      };
-    });
-
-  return availableTimeSlots;
+    .map((slotTime, index) => ({
+      id: `slot-${index}-${slotTime.getTime()}`,
+      professionalId,
+      salonId: professionalData.salonId,
+      startTime: slotTime,
+      endTime: new Date(slotTime.getTime() + 30 * 60000),
+      isBooked: false,
+    }));
 };
 
-// Busca agendamentos para um determinado salão, ordenados pelos mais recentes
+// Gets appointments for a salon
 export const getAppointmentsBySalon = async (salonId: string): Promise<Appointment[]> => {
   if (!salonId) return [];
-
-  const appointmentsCollectionRef = collection(db, 'appointments');
   const q = query(
-    appointmentsCollectionRef, 
+    collection(db, 'appointments'), 
     where('salonId', '==', salonId),
     orderBy('startTime', 'desc')
   );
-  
-  const querySnapshot = await getDocs(q);
-  if (querySnapshot.empty) {
-    console.log(`No appointments found for salon ID: ${salonId}`);
-    return [];
-  }
-  
-  const appointments: Appointment[] = querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      startTime: data.startTime.toDate(),
-      endTime: data.endTime.toDate(),
-    } as Appointment;
-  });
-  
-  return appointments;
+  return (await getDocs(q)).docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+    startTime: doc.data().startTime.toDate(),
+    endTime: doc.data().endTime.toDate(),
+  } as Appointment));
 };
 
-// Function to get appointments for a specific period (daily, weekly, monthly)
+// Gets appointments for reporting
 export const getAppointmentsForReporting = async (
   salonId: string,
   period: 'daily' | 'weekly' | 'monthly'
@@ -345,82 +269,128 @@ export const getAppointmentsForReporting = async (
     startDate = startOfDay(now);
     endDate = endOfDay(now);
   } else if (period === 'weekly') {
-    // startOfWeek uses Sunday as default start, locale might affect it
-    startDate = startOfWeek(now, { weekStartsOn: 0 }); // Sunday as start of week
+    startDate = startOfWeek(now, { weekStartsOn: 0 });
     endDate = endOfWeek(now, { weekStartsOn: 0 });
-  } else { // monthly
+  } else {
     startDate = startOfMonth(now);
     endDate = endOfMonth(now);
   }
 
-  const appointmentsCollectionRef = collection(db, 'appointments');
   const q = query(
-    appointmentsCollectionRef,
+    collection(db, 'appointments'),
     where('salonId', '==', salonId),
-    where('status', '==', 'completed'), // Only count completed appointments for revenue
+    where('status', '==', 'completed'),
     where('startTime', '>=', startDate),
     where('startTime', '<=', endDate),
     orderBy('startTime', 'desc')
   );
 
-  const querySnapshot = await getDocs(q);
-  const appointments: Appointment[] = querySnapshot.docs.map(doc => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      ...data,
-      startTime: data.startTime.toDate(),
-      endTime: data.endTime.toDate(),
-    } as Appointment;
-  });
-
-  return appointments;
+  return (await getDocs(q)).docs.map(doc => ({
+    id: doc.id,
+    ...doc.data(),
+    startTime: doc.data().startTime.toDate(),
+    endTime: doc.data().endTime.toDate(),
+  } as Appointment));
 };
 
-
-// Cria um novo agendamento no Firestore
+// Creates a new appointment
 export const createAppointment = async (appointmentData: Omit<Appointment, 'id'>): Promise<Appointment> => {
-  const appointmentsCollectionRef = collection(db, 'appointments');
-  const newAppointmentDocRef = await addDoc(appointmentsCollectionRef, appointmentData);
-  
-  return {
-    id: newAppointmentDocRef.id,
-    ...appointmentData
-  };
+  const docRef = await addDoc(collection(db, 'appointments'), appointmentData);
+  return { id: docRef.id, ...appointmentData };
 };
 
-// Atualiza o status de um agendamento existente
-export const updateAppointmentStatus = async (appointmentId: string, status: Appointment['status']): Promise<void> => {
-  const appointmentRef = doc(db, 'appointments', appointmentId);
-  await updateDoc(appointmentRef, { status: status });
+// Updates appointment status
+export const updateAppointmentStatus = async (appointmentId: string, status: string): Promise<void> => {
+  await updateDoc(doc(db, 'appointments', appointmentId), { status });
 };
 
-// Cancela (deleta) um agendamento.
+// Cancels an appointment
 export const cancelAppointment = async (appointmentId: string): Promise<void> => {
   await updateAppointmentStatus(appointmentId, 'cancelled');
 };
 
-// Se você realmente quiser deletar o documento do Firestore:
+// Deletes an appointment
 export const deleteAppointment = async (appointmentId: string): Promise<void> => {
-  const appointmentRef = doc(db, 'appointments', appointmentId);
-  await deleteDoc(appointmentRef);
+  await deleteDoc(doc(db, 'appointments', appointmentId));
 };
 
-// Busca todos os salões cadastrados no Firestore
+// Gets all salons
 export const getAllSalons = async (): Promise<Salon[]> => {
-  const salonsCollectionRef = collection(db, 'salons');
-  const q = query(salonsCollectionRef);
-  
-  const querySnapshot = await getDocs(q);
-  if (querySnapshot.empty) {
-    console.log("No salons found in the database.");
-    return [];
-  }
-  
-  const salons: Salon[] = querySnapshot.docs.map(doc => ({
+  return (await getDocs(collection(db, 'salons'))).docs.map(doc => ({
     id: doc.id,
     ...doc.data()
   } as Salon));
-  
-  return salons;
+};
+
+// Finds customer by phone and salon
+export const findCustomerByPhone = async (phone: string, salonId: string): Promise<Customer | null> => {
+  const q = query(
+    collection(db, 'customers'),
+    where('phone', '==', phone),
+    where('salonId', '==', salonId),
+    limit(1)
+  );
+  const snapshot = await getDocs(q);
+  return snapshot.empty ? null : { id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Customer;
+};
+
+// Creates a new customer
+export const createCustomer = async (phone: string, customerData: Omit<Customer, 'id'>): Promise<string> => {
+  const docRef = await addDoc(collection(db, 'customers'), {
+    ...customerData,
+    phone,
+    createdAt: serverTimestamp()
+  });
+  return docRef.id;
+};
+
+// Updates customer data
+export const updateCustomer = async (customerId: string, data: Partial<Customer>): Promise<void> => {
+  try {
+    const customerRef = doc(db, 'customers', customerId);
+    await updateDoc(customerRef, data);
+  } catch (error) {
+    console.error("Error updating customer:", error);
+    throw error;
+  }
+};
+
+// Deletes a customer
+export const deleteCustomer = async (customerId: string): Promise<void> => {
+  try {
+    const customerRef = doc(db, 'customers', customerId);
+    await deleteDoc(customerRef);
+  } catch (error) {
+    console.error("Error deleting customer:", error);
+    throw error;
+  }
+};
+
+// Gets all customers for a salon, ordered by creation date
+export const getCustomersBySalon = async (salonId: string): Promise<Customer[]> => {
+  try {
+    const customersRef = collection(db, 'customers');
+    const q = query(
+      customersRef,
+      where('salonId', '==', salonId)
+      // Removido orderBy('createdAt', 'desc') para evitar erro se algum cliente não tiver esse campo
+    );
+    const querySnapshot = await getDocs(q);
+    // Ordena manualmente se o campo existir
+    return querySnapshot.docs
+      .map(doc => ({ id: doc.id, ...doc.data() } as Customer))
+      .sort((a, b) => {
+        if (!a.createdAt || !b.createdAt) return 0;
+        // Suporta tanto string ISO quanto Timestamp do Firestore
+        const getTime = (val: any) => {
+          if (typeof val === 'string') return new Date(val).getTime();
+          if (val && typeof val.seconds === 'number') return val.seconds * 1000;
+          return 0;
+        };
+        return getTime(b.createdAt) - getTime(a.createdAt);
+      });
+  } catch (error) {
+    console.error("Error fetching customers:", error);
+    throw new Error("Failed to fetch customers");
+  }
 };

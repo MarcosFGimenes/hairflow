@@ -1,4 +1,18 @@
+import { Key } from "readline";
+
 // src/lib/types.ts
+export interface Customer {
+  id: string;
+  name: string;
+  phone: string;
+  email?: string;
+  salonId: string;
+  createdAt: string | any; // Use 'any' para Timestamp se não houver import
+  tags?: string[]; // NEW: Optional array of tags for the customer
+  lastVisit?: string | { seconds: number }; // Adicionado para controle de última visita
+  // outros campos que você precise
+}
+
 export interface Salon {
   id: string; // This will often be the adminUserId or a Firestore-generated ID
   name: string;
@@ -15,6 +29,7 @@ export interface Salon {
 }
 
 export interface Service {
+  id: string | number | null | undefined;
   name: string;
   price: number;
   duration: number; // Duration in minutes
