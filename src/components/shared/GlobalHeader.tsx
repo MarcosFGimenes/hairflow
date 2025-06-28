@@ -29,7 +29,7 @@ export function GlobalHeader() {
         <Logo />
         <nav className="flex items-center gap-2 sm:gap-4">
           <Link href="/appointments" legacyBehavior={false}>
-            <Button variant="ghost">Book Now</Button>
+            <Button variant="ghost">Agende agora!</Button>
           </Link>
 
           {loading ? (
@@ -41,7 +41,7 @@ export function GlobalHeader() {
               <Link href="/admin" legacyBehavior={false}>
                 <Button variant="outline">
                   <LayoutDashboard className="mr-0 sm:mr-2 h-4 w-4" /> 
-                  <span className="hidden sm:inline">Admin Panel</span>
+                  <span className="hidden sm:inline">Painel admin</span>
                 </Button>
               </Link>
               <Button variant="ghost" onClick={handleLogout} title="Logout">
@@ -60,7 +60,7 @@ export function GlobalHeader() {
           ) : (
             <Link href="/auth/login" legacyBehavior={false}>
               <Button variant="default">
-                <LogIn className="mr-2 h-4 w-4" /> Salon Login
+                <LogIn className="mr-2 h-4 w-4" /> Painel Admin
               </Button>
             </Link>
           )}
