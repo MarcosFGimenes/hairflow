@@ -4,6 +4,7 @@ import {
   doc, setDoc, getDoc, updateDoc, collection, query, where, 
   getDocs, limit, addDoc, orderBy, deleteDoc, serverTimestamp 
 } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { getDay, format, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import type { Appointment, TimeSlot, Salon, Professional, Service, Customer } from '@/lib/types';
 
@@ -39,7 +40,8 @@ export const createSalon = async (
     address: address || "",
     description: description || "",
     services: [],
-    adminId: ''
+    adminId: '',
+    pixCity: ''
   };
   await setDoc(salonRef, newSalon);
   return salonSlug;
@@ -392,5 +394,17 @@ export const getCustomersBySalon = async (salonId: string): Promise<Customer[]> 
   } catch (error) {
     console.error("Error fetching customers:", error);
     throw new Error("Failed to fetch customers");
+  }
+};
+
+export const generatePixForAppointment = async (salonId: string, amount: number, reference: string) => {
+  const functions = getFunctions();
+  const generatePix = httpsCallable(functions, 'generatePix');
+  try {
+    const result = await generatePix({ salonId, amount, reference });
+    return result.data as { pixCode: string };
+  } catch (error) {
+    console.error("Erro ao chamar a Cloud Function 'generatePix':", error);
+    throw new Error("Não foi possível gerar o QR Code Pix.");
   }
 };

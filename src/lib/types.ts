@@ -14,6 +14,7 @@ export interface Customer {
 }
 
 export interface Salon {
+  pixCity: string;
   id: string; // This will often be the adminUserId or a Firestore-generated ID
   name: string;
   slug: string; // For hairflow.com/appointments/[slug]
@@ -26,6 +27,8 @@ export interface Salon {
   logoUrl?: string; // URL for the salon's logo
   coverImageUrl?: string; // URL for the cover image
   services?: Service[]; // NEW: Array of services offered by the salon
+  pixKey?: string; // <-- ADICIONADO
+  pixKeyType?: 'CPF' | 'CNPJ' | 'Email' | 'Telefone' | 'Aleatória'; // <-- ADICIONADO
 }
 
 export interface Service {
@@ -67,6 +70,7 @@ export interface Appointment {
   status: 'scheduled' | 'confirmed' | 'cancelled' | 'completed';
   paymentStatus?: 'paid' | 'unpaid'; // Simplified credit/debit
   price?: number;
+  paymentMethod: string; // <-- ADICIONADO
 }
 
 export interface UserProfile {

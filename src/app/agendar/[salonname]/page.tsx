@@ -10,7 +10,8 @@ import {
     createAppointment, 
     getSalonServices,
     findCustomerByPhone,
-    createCustomer
+    createCustomer,
+    generatePixForAppointment
 } from '@/lib/firestoreService';
 import { useParams, useRouter } from 'next/navigation';
 import { GlobalHeader } from '@/components/shared/GlobalHeader';
@@ -22,19 +23,28 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { Salon, Professional, TimeSlot, Appointment, Service, Customer } from '@/lib/types';
-import { User, Phone, Mail, CheckCircle, ChevronLeft, Loader2, ArrowLeft, Calendar, Clock, Star } from 'lucide-react';
+import { User, Phone, CheckCircle, Loader2, Calendar, Star, Wallet, CreditCard, Landmark, DollarSign, Check, Copy } from 'lucide-react';
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
 import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
+import QRCode from "react-qr-code";
 import './booking-page.css';
 
 const bookingSteps = {
     PHONE_INPUT: 1,
     SCHEDULING: 2,
-    CONFIRMATION: 3,
+    PAYMENT: 3,
+    CONFIRMATION: 4,
 };
+
+const paymentOptions = [
+    { id: 'pix', name: 'Pix', icon: <Landmark className="w-5 h-5 mr-2" /> },
+    { id: 'credit_card', name: 'Cartão de Crédito', icon: <CreditCard className="w-5 h-5 mr-2" /> },
+    { id: 'cash', name: 'Dinheiro no Local', icon: <DollarSign className="w-5 h-5 mr-2" /> },
+];
 
 export default function SalonAppointmentPage() {
     const params = useParams();
@@ -63,6 +73,10 @@ export default function SalonAppointmentPage() {
     
     const [isConfirming, setIsConfirming] = useState(false);
     const [confirmedAppointment, setConfirmedAppointment] = useState<Appointment | null>(null);
+    const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | undefined>();
+    const [pixCode, setPixCode] = useState<string | null>(null);
+    const [isLoadingPix, setIsLoadingPix] = useState(false);
+    const [copied, setCopied] = useState(false);
 
     const currentProfessional = useMemo(() => 
         professionals.find(p => p.id === selectedProfessionalId), 
@@ -149,9 +163,21 @@ export default function SalonAppointmentPage() {
         }
     };
 
+    const handleProceedToPayment = () => {
+        if (!selectedSlot || !newCustomerName || !selectedService || !currentProfessional) {
+            toast({
+                title: "Quase lá!",
+                description: "Por favor, selecione um serviço, profissional e horário para continuar.",
+                variant: "destructive"
+            });
+            return;
+        }
+        setCurrentStep(bookingSteps.PAYMENT);
+    };
+
     const handleSubmitBooking = async () => {
-        if (!salon || !selectedProfessionalId || !selectedSlot || !selectedService || !currentProfessional || !newCustomerName) {
-            toast({ title: "Dados incompletos", description: "Preencha todos os campos obrigatórios.", variant: "destructive" });
+        if (!salon || !selectedProfessionalId || !selectedSlot || !selectedService || !currentProfessional || !newCustomerName || !selectedPaymentMethod) {
+            toast({ title: "Dados incompletos", description: "Preencha todos os campos e selecione uma forma de pagamento.", variant: "destructive" });
             return;
         }
         setIsConfirming(true);
@@ -167,6 +193,7 @@ export default function SalonAppointmentPage() {
                 salonId: salon.id, professionalId: selectedProfessionalId, clientName: newCustomerName,
                 clientPhone: clientPhone, serviceName: selectedService.name, startTime: selectedSlot.startTime,
                 endTime: selectedSlot.endTime, status: 'scheduled', price: selectedService.price,
+                paymentMethod: selectedPaymentMethod,
             };
             const newAppointment = await createAppointment(appointmentData);
             setConfirmedAppointment(newAppointment);
@@ -180,6 +207,34 @@ export default function SalonAppointmentPage() {
         }
     };
 
+    const handleSelectPaymentMethod = async (method: { id: string, name: string }) => {
+        setSelectedPaymentMethod(method.name);
+        setPixCode(null); // Limpa o código anterior ao trocar de método
+
+        if (method.id === 'pix' && salon && selectedService) {
+            setIsLoadingPix(true);
+            try {
+                // Gera uma referência única para o agendamento
+                const reference = `ag-${salon.id.substring(0, 4)}-${Date.now()}`;
+                const result = await generatePixForAppointment(salon.id, selectedService.price, reference);
+                setPixCode(result.pixCode);
+            } catch (error) {
+                toast({ title: "Erro no Pix", description: "Não foi possível gerar o QR Code.", variant: "destructive" });
+            } finally {
+                setIsLoadingPix(false);
+            }
+        }
+    };
+
+    const handleCopyPixCode = () => {
+        if (!pixCode) return;
+        navigator.clipboard.writeText(pixCode).then(() => {
+            setCopied(true);
+            toast({ title: "Copiado!", description: "Código Pix copiado para a área de transferência." });
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+    
     if (isLoadingSalon) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-background"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>
@@ -196,7 +251,6 @@ export default function SalonAppointmentPage() {
         <div className="flex flex-col min-h-screen bg-background">
             <GlobalHeader />
             
-            {/* INÍCIO DA ATUALIZAÇÃO: Seção Hero com Imagem */}
             <section className="relative flex items-center justify-center w-full h-64 md:h-80">
                 <Image
                     src={salon.coverImageUrl || 'https://placehold.co/1200x400/27272a/FFF?text=Hairflow'}
@@ -218,27 +272,25 @@ export default function SalonAppointmentPage() {
                     <p className="max-w-xl mt-2 text-lg text-white/90">{salon.description || salon.address}</p>
                 </div>
             </section>
-            {/* FIM DA ATUALIZAÇÃO */}
 
             <main className="container px-4 py-8 mx-auto max-w-md">
-                {/* O restante do seu código permanece exatamente o mesmo */}
                 <div className="mb-8">
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
-                            {currentStep === bookingSteps.PHONE_INPUT && "Começar"}
+                            {currentStep === bookingSteps.PHONE_INPUT && "Passo 1"}
+                            {currentStep === bookingSteps.SCHEDULING && "Passo 2"}
+                            {currentStep === bookingSteps.PAYMENT && "Passo 3"}
                         </span>
                         <span className="text-sm text-gray-500 dark:text-gray-500">
-                            0{currentStep}/03
+                            {currentStep}/{Object.keys(bookingSteps).length -1}
                         </span>
                     </div>
                     <div className="w-full h-2 bg-gray-200 rounded-full dark:bg-gray-700">
-                        <div 
-                            className="h-2 transition-all duration-300 rounded-full bg-teal-500 dark:bg-teal-600"
-                            style={{ width: `${(currentStep / 3) * 100}%` }}
-                        />
+                        <div className="h-2 transition-all duration-300 rounded-full bg-teal-500 dark:bg-teal-600" style={{ width: `${(currentStep / (Object.keys(bookingSteps).length -1)) * 100}%` }}/>
                     </div>
                 </div>
 
+                {/* ETAPA 1: TELEFONE */}
                 {currentStep === bookingSteps.PHONE_INPUT && (
                     <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/90 backdrop-blur-sm">
                         <CardContent className="p-8">
@@ -261,6 +313,7 @@ export default function SalonAppointmentPage() {
                     </Card>
                 )}
 
+                {/* ETAPA 2: AGENDAMENTO */}
                 {currentStep === bookingSteps.SCHEDULING && (
                     <div className="space-y-6">
                         <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/90 backdrop-blur-sm">
@@ -273,14 +326,8 @@ export default function SalonAppointmentPage() {
                                     </div>
                                 </div>
                                 <div className="space-y-4">
-                                    <div>
-                                        <Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Nome completo</Label>
-                                        <Input id="name" type="text" placeholder="Digite seu nome" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} className="mt-1 border-gray-200 dark:border-gray-600 focus:border-teal-500 focus:ring-teal-500 dark:bg-gray-700 dark:text-white" required />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">E-mail (opcional)</Label>
-                                        <Input id="email" type="email" placeholder="seu@email.com" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} className="mt-1 border-gray-200 dark:border-gray-600 focus:border-teal-500 focus:ring-teal-500 dark:bg-gray-700 dark:text-white" />
-                                    </div>
+                                    <div><Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Nome completo</Label><Input id="name" type="text" placeholder="Digite seu nome" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} className="mt-1 border-gray-200 dark:border-gray-600 focus:border-teal-500 focus:ring-teal-500 dark:bg-gray-700 dark:text-white" required /></div>
+                                    <div><Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">E-mail (opcional)</Label><Input id="email" type="email" placeholder="seu@email.com" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} className="mt-1 border-gray-200 dark:border-gray-600 focus:border-teal-500 focus:ring-teal-500 dark:bg-gray-700 dark:text-white" /></div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -289,21 +336,52 @@ export default function SalonAppointmentPage() {
                                 <div className="flex items-center gap-3 mb-4">
                                     <div className="flex items-center justify-center rounded-full w-10 h-10 bg-teal-100 dark:bg-teal-900/50"><Star className="w-5 h-5 text-teal-600 dark:text-teal-400" /></div>
                                     <div>
-                                        <h3 className="font-semibold text-gray-900 dark:text-white">Selecione o serviço</h3>
+                                        <h3 className="font-semibold text-gray-900 dark:text-white">Serviço e Profissional</h3>
                                         <p className="text-sm text-gray-600 dark:text-gray-400">Escolha o que você deseja</p>
                                     </div>
                                 </div>
-                                <div className="space-y-4">
+                                <div className="space-y-6">
+                                    {/* SELETOR DE SERVIÇO */}
                                     <div>
                                         <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de serviço</Label>
                                         <div className="mt-2 space-y-2">
                                             {salonServices.map(service => (<button key={String(service.id)} onClick={() => setSelectedServiceName(service.name)} className={`w-full p-4 text-left transition-all border-2 rounded-xl ${selectedServiceName === service.name ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/30 dark:border-teal-600' : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'}`}><div className="flex items-center justify-between"><div><p className="font-medium text-gray-900 dark:text-white">{service.name}</p><p className="text-sm text-gray-600 dark:text-gray-400">Duração: {service.duration}min</p></div><p className="font-bold text-teal-600 dark:text-teal-400">R$ {service.price.toFixed(2)}</p></div>{selectedServiceName === service.name && (<div className="mt-2"><div className="flex items-center justify-center ml-auto rounded-full w-6 h-6 bg-teal-500 dark:bg-teal-600"><CheckCircle className="w-4 h-4 text-white" /></div></div>)}</button>))}
                                         </div>
                                     </div>
+                                    
+                                    {/* INÍCIO DA ALTERAÇÃO: SELETOR DE PROFISSIONAL */}
                                     <div>
                                         <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Profissional</Label>
-                                        <Select value={selectedProfessionalId} onValueChange={setSelectedProfessionalId}><SelectTrigger className="mt-1 border-gray-200 dark:border-gray-600 focus:border-teal-500 focus:ring-teal-500 dark:bg-gray-700 dark:text-white"><SelectValue placeholder="Escolha um profissional" /></SelectTrigger><SelectContent className="bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">{professionals.map(p => (<SelectItem key={p.id} value={p.id} className="hover:bg-gray-100 dark:hover:bg-gray-700">{p.name}</SelectItem>))}</SelectContent></Select>
+                                        <div className="relative mt-2">
+                                            <div className="flex pb-2 space-x-3 overflow-x-auto">
+                                                {professionals.map(prof => {
+                                                    const isSelected = selectedProfessionalId === prof.id;
+                                                    return (
+                                                        <button 
+                                                            key={prof.id} 
+                                                            onClick={() => setSelectedProfessionalId(prof.id)}
+                                                            className={`flex flex-col items-center justify-center flex-shrink-0 p-2 space-y-2 text-center border-2 rounded-lg w-28 h-28 transition-all duration-200
+                                                                ${isSelected ? 'border-primary shadow-md' : 'border-transparent hover:bg-muted'}`}
+                                                        >
+                                                            <div className="relative">
+                                                                <Avatar className="w-16 h-16">
+                                                                    <AvatarImage src={prof.imageUrl || `https://ui-avatars.com/api/?name=${prof.name.replace(/\s/g, '+')}`} alt={prof.name} />
+                                                                    <AvatarFallback>{prof.name.substring(0, 2)}</AvatarFallback>
+                                                                </Avatar>
+                                                                {isSelected && (
+                                                                    <div className="absolute top-0 right-0 flex items-center justify-center w-5 h-5 -mt-1 -mr-1 rounded-full bg-primary">
+                                                                        <Check className="w-3 h-3 text-primary-foreground" />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                            <p className="text-xs font-medium text-center truncate text-foreground">{prof.name}</p>
+                                                        </button>
+                                                    )
+                                                })}
+                                            </div>
+                                        </div>
                                     </div>
+                                    {/* FIM DA ALTERAÇÃO */}
                                 </div>
                             </CardContent>
                         </Card>
@@ -318,27 +396,92 @@ export default function SalonAppointmentPage() {
                                         </div>
                                     </div>
                                     <div className="space-y-6">
-                                        <div>
-                                            <Label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Escolha a data</Label>
-                                            <BookingCalendar selectedDate={selectedDate} onDateSelect={setSelectedDate} />
-                                        </div>
-                                        <div>
-                                            <Label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Horários disponíveis</Label>
-                                            <SlotPicker availableSlots={availableSlots} selectedSlot={selectedSlot} onSlotSelect={setSelectedSlot} isLoading={isLoadingSlots} />
-                                        </div>
+                                        <div><Label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Escolha a data</Label><BookingCalendar selectedDate={selectedDate} onDateSelect={setSelectedDate} /></div>
+                                        <div><Label className="block mb-2 text-sm font-medium text-gray-700 dark:text-gray-300">Horários disponíveis</Label><SlotPicker availableSlots={availableSlots} selectedSlot={selectedSlot} onSlotSelect={setSelectedSlot} isLoading={isLoadingSlots} /></div>
                                     </div>
                                 </CardContent>
                             </Card>
                         )}
                         <div className="flex gap-3 pt-4">
                             <Button variant="outline" onClick={() => {setCustomer(null);setCurrentStep(bookingSteps.PHONE_INPUT);}} className="flex-1 h-12 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Voltar</Button>
-                            <Button onClick={handleSubmitBooking} disabled={isConfirming || !selectedSlot || !newCustomerName} className="flex-1 h-12 font-medium text-white bg-teal-500 hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-700">{isConfirming ? (<Loader2 className="w-5 h-5 animate-spin" />) : ("Agendar")}</Button>
+                            <Button onClick={handleProceedToPayment} className="flex-1 h-12">Ir para Pagamento</Button>
                         </div>
                     </div>
                 )}
-                
+
+                {/* ETAPA 3: PAGAMENTO */}
+                {currentStep === bookingSteps.PAYMENT && selectedService && currentProfessional && selectedSlot && (
+                    <div className="space-y-6">
+                        <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/90 backdrop-blur-sm">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2"><Wallet className="w-6 h-6 text-primary" />Resumo e Pagamento</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-6">
+                                {/* Resumo */}
+                                <div className="p-4 space-y-3 rounded-lg bg-muted/50 border">
+                                    <div className="flex justify-between"><p className="text-muted-foreground">Serviço:</p><p className="font-medium">{selectedService.name}</p></div>
+                                    <div className="flex justify-between"><p className="text-muted-foreground">Profissional:</p><p className="font-medium">{currentProfessional.name}</p></div>
+                                    <div className="flex justify-between"><p className="text-muted-foreground">Data:</p><p className="font-medium">{format(new Date(selectedSlot.startTime), "dd/MM/yyyy", { locale: ptBR })}</p></div>
+                                    <div className="flex justify-between"><p className="text-muted-foreground">Horário:</p><p className="font-medium">{format(new Date(selectedSlot.startTime), "HH:mm", { locale: ptBR })}</p></div>
+                                    <div className="pt-3 mt-3 text-lg font-bold border-t flex justify-between"><p className="text-muted-foreground">Total:</p><p className="text-primary">R$ {selectedService.price.toFixed(2)}</p></div>
+                                </div>
+                                {/* Seleção do Método de Pagamento */}
+                                <div>
+                                    <Label className="text-sm font-medium text-foreground">Escolha a forma de pagamento</Label>
+                                    <div className="mt-2 space-y-2">
+                                        {paymentOptions.map((option) => (
+                                            <button
+                                                key={option.id}
+                                                onClick={() => handleSelectPaymentMethod(option)}
+                                                className={`w-full flex items-center p-4 text-left transition-all border-2 rounded-xl 
+                                                    ${selectedPaymentMethod === option.name ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}
+                                            >
+                                                {option.icon}
+                                                <span className="font-medium">{option.name}</span>
+                                                {selectedPaymentMethod === option.name && (
+                                                    <CheckCircle className="w-5 h-5 ml-auto text-primary" />
+                                                )}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* --- INÍCIO DA ALTERAÇÃO: Exibição do QR Code --- */}
+                                {selectedPaymentMethod === 'Pix' && (
+                                    <div className="mt-6 text-center">
+                                        {isLoadingPix && <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />}
+                                        
+                                        {pixCode && !isLoadingPix && (
+                                            <Card className="p-4 bg-white">
+                                                <QRCode
+                                                    value={pixCode}
+                                                    size={256}
+                                                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                                                    viewBox={`0 0 256 256`}
+                                                />
+                                                <Button onClick={handleCopyPixCode} className="w-full mt-4">
+                                                    {copied ? <CheckCircle className="mr-2"/> : <Copy className="mr-2"/>}
+                                                    {copied ? 'Copiado!' : 'Copiar Código Pix'}
+                                                </Button>
+                                            </Card>
+                                        )}
+                                    </div>
+                                )}
+                                {/* --- FIM DA ALTERAÇÃO --- */}
+                            </CardContent>
+                        </Card>
+                        <div className="flex gap-3 pt-4">
+                            <Button variant="outline" onClick={() => setCurrentStep(bookingSteps.SCHEDULING)} className="flex-1 h-12">Voltar</Button>
+                            <Button onClick={handleSubmitBooking} disabled={!selectedPaymentMethod || isConfirming} className="flex-1 h-12">
+                                {isConfirming ? <Loader2 className="animate-spin" /> : 'Confirmar Agendamento'}
+                            </Button>
+                        </div>
+                    </div>
+                )}
+
+                {/* ETAPA 4: CONFIRMAÇÃO */}
                 {currentStep === bookingSteps.CONFIRMATION && confirmedAppointment && (
-                    <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/90 backdrop-blur-sm">
+                     <Card className="border-0 shadow-lg bg-white/80 dark:bg-gray-800/90 backdrop-blur-sm">
                         <CardContent className="p-8 text-center">
                             <div className="flex items-center justify-center mx-auto mb-6 rounded-full w-16 h-16 bg-green-100 dark:bg-green-900/30"><CheckCircle className="w-8 h-8 text-green-600 dark:text-green-400" /></div>
                             <h2 className="mb-2 text-2xl font-bold text-gray-900 dark:text-white">Agendamento enviado!</h2>
@@ -351,6 +494,7 @@ export default function SalonAppointmentPage() {
                                     <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Data:</span><span className="font-medium text-gray-900 dark:text-white">{new Date(confirmedAppointment.startTime).toLocaleDateString('pt-BR')}</span></div>
                                     <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Horário:</span><span className="font-medium text-gray-900 dark:text-white">{new Date(confirmedAppointment.startTime).toLocaleTimeString('pt-BR', {hour: '2-digit', minute: '2-digit'})}</span></div>
                                     <div className="flex justify-between pt-2 mt-2 border-t border-gray-200 dark:border-gray-600"><span className="text-gray-600 dark:text-gray-400">Valor:</span><span className="font-bold text-teal-600 dark:text-teal-400">R$ {(confirmedAppointment.price ?? 0).toFixed(2)}</span></div>
+                                    <div className="flex justify-between"><span className="text-gray-600 dark:text-gray-400">Pagamento:</span><span className="font-medium text-gray-900 dark:text-white">{confirmedAppointment.paymentMethod}</span></div>
                                 </div>
                             </div>
                             <Button onClick={() => router.push('/')} className="w-full h-12 font-medium text-white bg-teal-500 hover:bg-teal-600 dark:bg-teal-600 dark:hover:bg-teal-700">Voltar ao início</Button>

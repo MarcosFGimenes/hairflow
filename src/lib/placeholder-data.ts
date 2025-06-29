@@ -7,7 +7,7 @@ export const placeholderSalons: Salon[] = [
     slug: 'cool-cuts',
     contactNumber: '+15551234567', // Example format for WhatsApp
     address: '123 Main St, Anytown, USA',
-    adminUserId: 'adminUser1',
+    adminId: ''
   },
   {
     id: 'salon2',
@@ -15,7 +15,7 @@ export const placeholderSalons: Salon[] = [
     slug: 'glamour-hair',
     contactNumber: '+15557654321',
     address: '456 Oak Ave, Anytown, USA',
-    adminUserId: 'adminUser2',
+    adminId: ''
   },
 ];
 
@@ -63,10 +63,11 @@ export const placeholderAppointments: Appointment[] = [
     clientPhone: '+15550001111',
     serviceName: 'Men\'s Haircut',
     startTime: createDate(0, 10, 0), // Today at 10:00 AM
-    endTime: createDate(0, 10, 45),   // Today at 10:45 AM
+    endTime: createDate(0, 10, 45), // Today at 10:45 AM
     status: 'scheduled',
     paymentStatus: 'unpaid',
     price: 30,
+    paymentMethod: ''
   },
   {
     id: 'appt2',
@@ -76,10 +77,11 @@ export const placeholderAppointments: Appointment[] = [
     clientPhone: '+15552223333',
     serviceName: 'Fade Haircut',
     startTime: createDate(0, 14, 0), // Today at 2:00 PM
-    endTime: createDate(0, 15, 0),    // Today at 3:00 PM
+    endTime: createDate(0, 15, 0), // Today at 3:00 PM
     status: 'confirmed',
     paymentStatus: 'paid',
     price: 40,
+    paymentMethod: ''
   },
   {
     id: 'appt3',
@@ -89,10 +91,11 @@ export const placeholderAppointments: Appointment[] = [
     clientPhone: '+15554445555',
     serviceName: 'Hair Coloring',
     startTime: createDate(1, 11, 0), // Tomorrow at 11:00 AM
-    endTime: createDate(1, 13, 0),   // Tomorrow at 1:00 PM
+    endTime: createDate(1, 13, 0), // Tomorrow at 1:00 PM
     status: 'scheduled',
     notes: 'Wants a vibrant red color.',
     price: 120,
+    paymentMethod: ''
   },
 ];
 

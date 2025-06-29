@@ -44,12 +44,9 @@ export function ConfirmationDialog({
     const salonContact = salonDetails.contactNumber ?? "";
     const clientName = appointmentDetails.clientName;
 
+    // A mensagem para copiar/compartilhar continua detalhada, como você queria.
     const confirmationMessage = 
-`Olá ${salonName}! Esta é uma confirmação do agendamento de ${clientName}:
-Serviço: ${service}
-Com: ${professionalName}
-Quando: ${appointmentTime}
-Até breve! - Hairflow Booking`;
+`Comprovante de Agendamento Hairflow\n\nSalão: ${salonName}\nCliente: ${clientName}\nServiço: ${service}\nProfissional: ${professionalName}\nData: ${appointmentTime}\nPagamento: ${appointmentDetails.paymentMethod || '-'}\nValor: R$ ${(appointmentDetails.price ?? 0).toFixed(2)}\n\nAgradecemos por agendar conosco!`;
 
     const encodedMessage = encodeURIComponent(confirmationMessage);
     const whatsappNumber = salonContact.replace(/\D/g, '');
@@ -64,7 +61,6 @@ Até breve! - Hairflow Booking`;
 
     return (
         <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
-            {/* Conteúdo do Dialog com estilos para tema escuro e claro */}
             <AlertDialogContent className="max-w-md p-0 overflow-hidden border-border shadow-2xl bg-card">
                 <AlertDialogHeader className="p-6 text-center">
                     <div className="flex justify-center mb-4">
@@ -78,7 +74,7 @@ Até breve! - Hairflow Booking`;
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 
-                {/* Corpo do Dialog com os detalhes */}
+                {/* Corpo do Dialog com os detalhes (agora sem duplicação) */}
                 <div className="px-6 pb-6 space-y-4">
                     <div className="p-4 space-y-3 rounded-lg bg-muted/50 border">
                         <DetailRow label="Serviço" value={service} />
@@ -86,6 +82,9 @@ Até breve! - Hairflow Booking`;
                         <DetailRow label="Data & Horário" value={appointmentTime} />
                         {salonDetails.address && (
                             <DetailRow label="Local" value={salonDetails.address} />
+                        )}
+                        {appointmentDetails.paymentMethod && (
+                            <DetailRow label="Pagamento" value={appointmentDetails.paymentMethod} />
                         )}
                         <div className="pt-2 mt-2 border-t border-border">
                             <DetailRow 
@@ -95,6 +94,7 @@ Até breve! - Hairflow Booking`;
                             />
                         </div>
                     </div>
+                    {/* O BLOCO REDUNDANTE "Comprovante visual" FOI REMOVIDO DAQUI */}
                 </div>
 
                 {/* Rodapé com os botões de ação */}
@@ -105,7 +105,7 @@ Até breve! - Hairflow Booking`;
                         className="w-full sm:w-auto"
                     >
                         {copied ? <CheckCircle className="w-4 h-4 mr-2 text-primary" /> : <Copy className="w-4 h-4 mr-2" />}
-                        {copied ? "Copiado!" : "Copiar"}
+                        {copied ? "Copiado!" : "Copiar texto"}
                     </Button>
                     <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto">
                         <Button className="w-full">
