@@ -46,10 +46,15 @@ const salonSettingsSchema = z.object({
     email: z.string().email("Endereço de e-mail inválido.").optional(),
     logoUrl: z.string().url("Por favor, insira uma URL válida para o logo.").optional().or(z.literal('')),
     coverImageUrl: z.string().url("Por favor, insira uma URL válida para a imagem de capa.").optional().or(z.literal('')),
-    // Campos do Pix
-    pixKeyType: z.string().optional(),
-    pixKey: z.string().optional(),
-    pixCity: z.string().optional(), // <-- CAMPO ADICIONADO
+    abacatepayApiKey: z.string()
+        .refine(
+            (key) => key === '' || key.startsWith('abc_') || key.startsWith('abs_'),
+            {
+                message: 'Formato de chave inválido. A chave deve começar com "abc_" ou "abs_".'
+            }
+        )
+        .optional()
+        .or(z.literal('')),
 });
 
 type SalonSettingsFormValues = z.infer<typeof salonSettingsSchema>;
@@ -65,7 +70,7 @@ export default function SettingsPage() {
         defaultValues: {
             name: "", slug: "", contactNumber: "", address: "",
             description: "", email: "", logoUrl: "", coverImageUrl: "",
-            pixKeyType: "", pixKey: "",
+            abacatepayApiKey: "",
         },
     });
 
@@ -85,8 +90,7 @@ export default function SettingsPage() {
                             email: salonData.email || "",
                             logoUrl: salonData.logoUrl || "",
                             coverImageUrl: salonData.coverImageUrl || "",
-                            pixKeyType: salonData.pixKeyType || "",
-                            pixKey: salonData.pixKey || "",
+                            abacatepayApiKey: salonData.abacatepayApiKey || "",
                         });
                     }
                 } catch (error) {
@@ -108,12 +112,7 @@ export default function SettingsPage() {
         }
         setIsSaving(true);
         try {
-            const allowedPixTypes = ["CPF", "CNPJ", "Email", "Telefone", "Aleatória"] as const;
-            const safePixKeyType = allowedPixTypes.includes(data.pixKeyType as any)
-                ? data.pixKeyType as typeof allowedPixTypes[number]
-                : undefined;
-
-            await updateSalonSettings(user.uid, { ...data, pixKeyType: safePixKeyType });
+            await updateSalonSettings(user.uid, data);
             toast({ title: "Sucesso", description: "Configurações atualizadas com sucesso!" });
         } catch (error) {
             console.error("Erro ao atualizar as configurações:", error);
@@ -168,57 +167,28 @@ export default function SettingsPage() {
                         </CardContent>
                     </Card>
 
-                    {/* INÍCIO DA ALTERAÇÃO: CARD DE CONFIGURAÇÕES PIX */}
+                    {/* INÍCIO DA ALTERAÇÃO: CARD DE CONFIGURAÇÕES ABACATEPAY */}
                     <Card className="shadow-lg">
                         <CardHeader>
-                            <CardTitle className="font-headline">Configurações de Pagamento (Pix)</CardTitle>
-                            <CardDescription>Configure sua chave Pix para gerar QR Codes automaticamente na tela de pagamento.</CardDescription>
+                            <CardTitle className="font-headline">Configurações de Pagamento (AbacatePay)</CardTitle>
+                            <CardDescription>
+                                Conecte sua conta AbacatePay para aceitar pagamentos online de forma segura.
+                            </CardDescription>
                         </CardHeader>
-                        <CardContent className="space-y-6">
+                        <CardContent>
                             <FormField
                                 control={form.control}
-                                name="pixKeyType"
+                                name="abacatepayApiKey"
                                 render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Tipo de Chave Pix</FormLabel>
-                                        <Select onValueChange={field.onChange} value={field.value || ''}>
-                                            <FormControl>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Selecione o tipo da chave" />
-                                                </SelectTrigger>
-                                            </FormControl>
-                                            <SelectContent>
-                                                <SelectItem value="CPF">CPF</SelectItem>
-                                                <SelectItem value="CNPJ">CNPJ</SelectItem>
-                                                <SelectItem value="Email">E-mail</SelectItem>
-                                                <SelectItem value="Telefone">Telefone</SelectItem>
-                                                <SelectItem value="Aleatoria">Chave Aleatória</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="pixKey"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Chave Pix</FormLabel>
-                                        <FormControl><Input placeholder="Sua chave aqui" {...field} /></FormControl>
-                                        <FormDescription>Insira a chave correspondente ao tipo selecionado.</FormDescription>
-                                        <FormMessage />
-                                    </FormItem>
-                                )}
-                            />
-                            <FormField
-                                control={form.control}
-                                name="pixCity"
-                                render={({ field }) => (
-                                    <FormItem>
-                                        <FormLabel>Cidade do Titular da Chave</FormLabel>
-                                        <FormControl><Input placeholder="SAO PAULO" {...field} /></FormControl>
-                                        <FormDescription>A cidade que aparecerá no comprovante Pix. Ex: SAO PAULO (sem acentos).</FormDescription>
+                                        <FormLabel>Chave Secreta da API AbacatePay (Secret Key)</FormLabel>
+                                        <FormControl>
+                                            <Input type="password" placeholder="Cole sua chave aqui (ex: abs_prod_...)" {...field} />
+                                        </FormControl>
+                                        <FormDescription>
+                                            É crucial que você insira sua <b>Chave Secreta</b> (geralmente com prefixo <code>abs_</code> ou <code>abc_</code>).<br/>
+                                            Ela é usada para criar cobranças de forma segura no servidor.
+                                        </FormDescription>
                                         <FormMessage />
                                     </FormItem>
                                 )}

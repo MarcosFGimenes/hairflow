@@ -32,6 +32,7 @@ import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "react-qr-code";
 import './booking-page.css';
+import { getFunctions, httpsCallable } from "firebase/functions";
 
 const bookingSteps = {
     PHONE_INPUT: 1,
@@ -43,8 +44,11 @@ const bookingSteps = {
 const paymentOptions = [
     { id: 'pix', name: 'Pix', icon: <Landmark className="w-5 h-5 mr-2" /> },
     { id: 'credit_card', name: 'Cartão de Crédito', icon: <CreditCard className="w-5 h-5 mr-2" /> },
-    { id: 'cash', name: 'Dinheiro no Local', icon: <DollarSign className="w-5 h-5 mr-2" /> },
+    { id: 'in_person', name: 'Pagar no Salão', icon: <DollarSign className="w-5 h-5 mr-2" /> },
 ];
+
+const functions = getFunctions();
+const createAbacatePayBilling = httpsCallable(functions, 'createAbacatePayBilling');
 
 export default function SalonAppointmentPage() {
     const params = useParams();
@@ -75,6 +79,7 @@ export default function SalonAppointmentPage() {
     const [confirmedAppointment, setConfirmedAppointment] = useState<Appointment | null>(null);
     const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<string | undefined>();
     const [pixCode, setPixCode] = useState<string | null>(null);
+    const [pixCopiaECola, setPixCopiaECola] = useState<string>("");
     const [isLoadingPix, setIsLoadingPix] = useState(false);
     const [copied, setCopied] = useState(false);
 
@@ -209,17 +214,43 @@ export default function SalonAppointmentPage() {
 
     const handleSelectPaymentMethod = async (method: { id: string, name: string }) => {
         setSelectedPaymentMethod(method.name);
-        setPixCode(null); // Limpa o código anterior ao trocar de método
+        setPixCode(null);
+        setPixCopiaECola("");
 
-        if (method.id === 'pix' && salon && selectedService) {
+        if (method.id === 'in_person') {
+            setIsLoadingPix(false);
+            return;
+        }
+
+        if ((method.id === 'pix' || method.id === 'credit_card') && salon && selectedService) {
             setIsLoadingPix(true);
             try {
-                // Gera uma referência única para o agendamento
-                const reference = `ag-${salon.id.substring(0, 4)}-${Date.now()}`;
-                const result = await generatePixForAppointment(salon.id, selectedService.price, reference);
-                setPixCode(result.pixCode);
+                const customerInfo = { name: newCustomerName, email: newCustomerEmail, phone: clientPhone };
+                const paymentMethodToSend = method.id === 'pix' ? 'PIX' : 'CREDIT_CARD';
+                const result: any = await createAbacatePayBilling({
+                    salonId: salon.id,
+                    serviceId: selectedService.id,
+                    customerInfo: customerInfo,
+                    paymentMethod: paymentMethodToSend,
+                });
+
+                if (paymentMethodToSend === 'CREDIT_CARD') {
+                    if (result.data && result.data.payment_url) {
+                        window.location.href = result.data.payment_url;
+                    } else {
+                        throw new Error("URL de pagamento para cartão de crédito não recebida.");
+                    }
+                } else if (paymentMethodToSend === 'PIX') {
+                    if (result.data && result.data.pix_qr_code) {
+                        setPixCode(result.data.pix_qr_code);
+                        setPixCopiaECola(result.data.pix_string);
+                    } else {
+                        throw new Error("Dados do PIX não recebidos.");
+                    }
+                }
             } catch (error) {
-                toast({ title: "Erro no Pix", description: "Não foi possível gerar o QR Code.", variant: "destructive" });
+                console.error(`Erro ao processar pagamento com ${method.name}:`, error);
+                toast({ title: "Erro no Pagamento", description: `Não foi possível iniciar o pagamento. Tente novamente.`, variant: "destructive" });
             } finally {
                 setIsLoadingPix(false);
             }

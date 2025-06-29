@@ -1,6 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
 import cors from "cors";
+import axios from "axios"; // Usaremos axios para a requisição HTTP
 
 // --- INÍCIO DA SOLUÇÃO DEFINITIVA ---
 
@@ -138,4 +139,81 @@ export const generatePix = functions.https.onRequest((request, response) => {
       });
     }
   });
+});
+
+export const createAbacatePayBilling = functions.https.onCall(async (data: any) => {
+    // Agora recebemos também o 'paymentMethod'
+    const { salonId, serviceId, customerInfo, paymentMethod } = data;
+
+    if (!salonId || !serviceId || !customerInfo || !paymentMethod) {
+        throw new functions.https.HttpsError("invalid-argument", "Dados da cobrança incompletos.");
+    }
+
+    // Validação simples do método de pagamento
+    const supportedMethods = ["PIX", "CREDIT_CARD"];
+    if (!supportedMethods.includes(paymentMethod)) {
+        throw new functions.https.HttpsError("invalid-argument", `Método de pagamento '${paymentMethod}' não suportado.`);
+    }
+
+    try {
+        const salonDoc = await admin.firestore().collection("salons").doc(salonId).get();
+        if (!salonDoc.exists) {
+            throw new functions.https.HttpsError("not-found", "Salão não encontrado.");
+        }
+        
+        const salonData = salonDoc.data();
+        if (!salonData?.abacatepayApiKey) {
+            throw new functions.https.HttpsError("not-found", "Chave da API AbacatePay não configurada para este salão.");
+        }
+
+        const serviceDoc = await admin.firestore()
+            .collection("salons").doc(salonId)
+            .collection("services").doc(serviceId)
+            .get();
+
+        if (!serviceDoc.exists) {
+            throw new functions.https.HttpsError("not-found", "O serviço selecionado não foi encontrado.");
+        }
+        const serviceData = serviceDoc.data();
+        if (!serviceData || !serviceData.price || !serviceData.name) {
+             throw new functions.https.HttpsError("internal", "Os dados do serviço estão incompletos.");
+        }
+
+        const apiKey = salonData.abacatepayApiKey;
+        
+        // Payload dinâmico para a API
+        const payload: any = {
+            amount: serviceData.price * 100,
+            description: `Agendamento: ${serviceData.name}`,
+            customer: customerInfo,
+            methods: [paymentMethod], // Usa o método de pagamento recebido
+        };
+
+        // Adiciona a URL de retorno se for cartão de crédito
+        if (paymentMethod === 'CREDIT_CARD') {
+            // IMPORTANTE: Substitua 'seusite.com' pelo domínio real da sua aplicação.
+            // Esta é a página para onde o usuário será redirecionado após o pagamento.
+            payload.returnUrl = `https://seusite.com/agendar/${salonData.slug}?status=success`;
+        }
+
+        const abacatePayResponse = await axios.post(
+            "https://api.abacatepay.com/v1/billing/create",
+            payload,
+            {
+                headers: {
+                    "Authorization": `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                },
+            }
+        );
+
+        return abacatePayResponse.data;
+
+    } catch (error: any) {
+        functions.logger.error("Erro ao criar cobrança AbacatePay:", error);
+        if (axios.isAxiosError(error) && error.response) {
+            throw new functions.https.HttpsError("internal", `Erro da API AbacatePay: ${error.response.statusText}`, error.response.data);
+        }
+        throw new functions.https.HttpsError("internal", "Não foi possível criar a cobrança.");
+    }
 });
