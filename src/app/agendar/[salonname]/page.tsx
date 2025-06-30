@@ -5,13 +5,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
     getProfessionalsBySalon, 
-    getSalonBySlug, 
     getAvailableSlotsForProfessional, 
     createAppointment, 
-    getSalonServices,
     findCustomerByPhone,
-    createCustomer,
-    generatePixForAppointment
+    createCustomer
 } from '@/lib/firestoreService';
 import { db } from '@/lib/firebase';
 import { collection, query, where, getDocs } from 'firebase/firestore';
@@ -34,7 +31,6 @@ import Image from 'next/image';
 import { useToast } from "@/hooks/use-toast";
 import QRCode from "react-qr-code";
 import './booking-page.css';
-import { getFunctions, httpsCallable } from "firebase/functions";
 
 const bookingSteps = {
     PHONE_INPUT: 1,
@@ -48,9 +44,6 @@ const paymentOptions = [
     { id: 'credit_card', name: 'Cartão de Crédito', icon: <CreditCard className="w-5 h-5 mr-2" /> },
     { id: 'in_person', name: 'Pagar no Salão', icon: <DollarSign className="w-5 h-5 mr-2" /> },
 ];
-
-const functions = getFunctions();
-const createAbacatePayBilling = httpsCallable(functions, 'createAbacatePayBilling');
 
 export default function SalonAppointmentPage() {
     const params = useParams();
@@ -95,58 +88,77 @@ export default function SalonAppointmentPage() {
         [salonServices, selectedServiceName]
     );
 
-    // --- NOVO useEffect PARA BUSCAR SALÃO E SERVIÇOS ---
+    // --- EFEITO 1: BUSCAR DADOS DO SALÃO E SERVIÇOS ---
     useEffect(() => {
         const fetchSalonData = async () => {
-            if (params.salonname) {
-                const normalizedSlug = Array.isArray(params.salonname)
-                    ? params.salonname[0].toLowerCase()
-                    : params.salonname.toLowerCase();
+            setIsLoadingSalon(true);
+            if (salonSlug) {
+                const normalizedSlug = Array.isArray(salonSlug)
+                    ? salonSlug[0].toLowerCase()
+                    : salonSlug.toLowerCase();
                 const q = query(collection(db, "salons"), where("slug", "==", normalizedSlug));
                 try {
                     const querySnapshot = await getDocs(q);
                     if (!querySnapshot.empty) {
                         const salonDoc = querySnapshot.docs[0];
                         const salonData = salonDoc.data() as Omit<Salon, 'id'>;
-                        setSalon({ id: salonDoc.id, ...salonData });
+                        const currentSalon = { id: salonDoc.id, ...salonData };
+                        setSalon(currentSalon);
 
-                        // --- INÍCIO DA CORREÇÃO ---
-                        // Busca a subcoleção de serviços
+                        // Busca serviços da subcoleção
                         const servicesCollectionRef = collection(db, "salons", salonDoc.id, "services");
                         const servicesSnapshot = await getDocs(servicesCollectionRef);
-                        // Mapeia os documentos e ADICIONA O ID a cada objeto de serviço
-                        const servicesData: Service[] = servicesSnapshot.docs.map((doc) => {
-                            const data = doc.data();
-                            return {
-                                id: doc.id,
-                                name: data.name ?? '',
-                                price: data.price ?? 0,
-                                duration: data.duration ?? 0,
-                                ...data
-                            } as Service;
-                        });
+                        const servicesData: Service[] = servicesSnapshot.docs.map(doc => ({
+                            id: doc.id,
+                            ...doc.data()
+                        } as Service));
                         setSalonServices(servicesData);
-                        // --- FIM DA CORREÇÃO ---
                     } else {
                         console.log("Nenhum salão encontrado com este slug!");
                         setSalon(null);
                     }
                 } catch (error) {
                     console.error("Erro ao buscar dados do salão:", error);
+                    toast({ title: "Erro", description: "Não foi possível carregar os dados do salão.", variant: "destructive" });
+                    setSalon(null);
+                } finally {
+                    // O isLoadingSalon será desativado no próximo useEffect, após carregar os profissionais
                 }
+            } else {
+                 setIsLoadingSalon(false);
             }
         };
         fetchSalonData();
-    }, [params.salonname]);
+    }, [salonSlug, toast]);
 
+    // --- EFEITO 2: BUSCAR PROFISSIONAIS APÓS SALÃO SER CARREGADO ---
+    useEffect(() => {
+        const fetchProfessionals = async () => {
+            if (salon?.id) {
+                try {
+                    const profs = await getProfessionalsBySalon(salon.id);
+                    setProfessionals(profs);
+                } catch (error) {
+                     console.error("Erro ao buscar profissionais:", error);
+                     toast({ title: "Erro", description: "Não foi possível carregar os profissionais.", variant: "destructive" });
+                } finally {
+                    setIsLoadingSalon(false); // Desativa o loading principal aqui
+                }
+            }
+        }
+        fetchProfessionals();
+    }, [salon, toast]);
+
+
+    // --- EFEITO 3: BUSCAR HORÁRIOS DISPONÍVEIS ---
     useEffect(() => {
         if (!selectedDate || !selectedProfessionalId || !selectedService) {
             setAvailableSlots([]);
-            setSelectedSlot(null);
             return;
         }
         const fetchSlots = async () => {
             setIsLoadingSlots(true);
+            setSelectedSlot(null);
             try {
                 const slots = await getAvailableSlotsForProfessional(selectedProfessionalId, new Date(selectedDate), selectedService.duration);
                 setAvailableSlots(slots);
@@ -155,7 +167,6 @@ export default function SalonAppointmentPage() {
                 toast({ title: "Erro ao buscar horários", description: "Não foi possível carregar os horários disponíveis.", variant: "destructive" });
             } finally {
                 setIsLoadingSlots(false);
-                setSelectedSlot(null);
             }
         };
         fetchSlots();
@@ -173,15 +184,13 @@ export default function SalonAppointmentPage() {
                 toast({ title: `Bem-vindo(a) de volta, ${foundCustomer.name}!`, description: "Seus dados foram carregados." });
             } else {
                 setCustomer(null);
-                setNewCustomerName('');
-                setNewCustomerEmail('');
                 toast({ title: "Cliente novo!", description: "Por favor, complete seus dados para agendar." });
             }
             setCurrentStep(bookingSteps.SCHEDULING);
         } catch (error) {
             console.error("Erro ao buscar cliente:", error);
             toast({ title: "Erro", description: "Ocorreu um problema ao verificar seu número. Por favor, preencha os dados manualmente.", variant: "destructive" });
-            setCurrentStep(bookingSteps.SCHEDULING);
+            setCurrentStep(bookingSteps.SCHEDULING); // Avança mesmo com erro para não bloquear o usuário
         } finally {
             setIsCheckingPhone(false);
         }
@@ -199,6 +208,74 @@ export default function SalonAppointmentPage() {
         setCurrentStep(bookingSteps.PAYMENT);
     };
 
+     const handleSelectPaymentMethod = async (method: { id: string, name: string }) => {
+        setSelectedPaymentMethod(method.name);
+        setPixCode(null);
+        setPixCopiaECola('');
+
+        if (method.id === 'in_person') {
+            return;
+        }
+        
+        if (!salon || !selectedService || !newCustomerName) {
+            toast({ title: "Erro", description: "Dados do agendamento incompletos para gerar pagamento.", variant: "destructive"});
+            return;
+        }
+
+        if (method.id === 'pix' || method.id === 'credit_card') {
+            setIsLoadingPix(true);
+            try {
+                const paymentMethodToSend = method.id === 'pix' ? 'PIX' : 'CREDIT_CARD';
+                
+                const functionUrl = `https://us-central1-hairflow-lmlxh.cloudfunctions.net/createAbacatePayBilling`;
+
+                const payload = {
+                    salonId: salon.id,
+                    serviceId: selectedService.id, // ID do serviço agora está garantido
+                    customerInfo: { name: newCustomerName, email: newCustomerEmail, phone: clientPhone },
+                    paymentMethod: paymentMethodToSend,
+                };
+                
+                console.log("Enviando para o Firebase Functions:", payload);
+
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
+                });
+
+                if (!response.ok) {
+                    const errorBody = await response.text();
+                    console.error("Erro da API de pagamento:", errorBody);
+                    throw new Error(errorBody || "Falha ao se comunicar com o serviço de pagamento.");
+                }
+
+                const result = await response.json();
+                const responseData = result.data;
+
+                if (paymentMethodToSend === 'CREDIT_CARD') {
+                    if (responseData?.payment_url) {
+                        window.location.href = responseData.payment_url;
+                    } else {
+                        throw new Error("URL de pagamento para cartão de crédito não recebida.");
+                    }
+                } else { // PIX
+                    if (responseData?.pix_qr_code && responseData?.pix_string) {
+                        setPixCode(responseData.pix_qr_code);
+                        setPixCopiaECola(responseData.pix_string);
+                    } else {
+                        throw new Error("Dados do PIX não recebidos.");
+                    }
+                }
+            } catch (error: any) {
+                console.error(`Erro ao processar pagamento com ${method.name}:`, error);
+                toast({ title: "Erro no Pagamento", description: error.message, variant: "destructive" });
+            } finally {
+                setIsLoadingPix(false);
+            }
+        }
+    };
+
     const handleSubmitBooking = async () => {
         if (!salon || !selectedProfessionalId || !selectedSlot || !selectedService || !currentProfessional || !newCustomerName || !selectedPaymentMethod) {
             toast({ title: "Dados incompletos", description: "Preencha todos os campos e selecione uma forma de pagamento.", variant: "destructive" });
@@ -206,18 +283,31 @@ export default function SalonAppointmentPage() {
         }
         setIsConfirming(true);
         try {
+            let customerId = customer?.id;
             if (!customer) {
                 const newCustomerData: Omit<Customer, 'id'> = {
-                    phone: clientPhone, name: newCustomerName, email: newCustomerEmail,
-                    salonId: salon.id, createdAt: new Date().toISOString(),
+                    phone: clientPhone, 
+                    name: newCustomerName, 
+                    email: newCustomerEmail,
+                    salonId: salon.id, 
+                    createdAt: new Date().toISOString(),
                 };
-                await createCustomer(clientPhone, newCustomerData);
+                // A função createCustomer deve retornar o ID do novo cliente
+                customerId = await createCustomer(clientPhone, newCustomerData);
             }
+
             const appointmentData: Omit<Appointment, 'id'> = {
-                salonId: salon.id, professionalId: selectedProfessionalId, clientName: newCustomerName,
-                clientPhone: clientPhone, serviceName: selectedService.name, startTime: selectedSlot.startTime,
-                endTime: selectedSlot.endTime, status: 'scheduled', price: selectedService.price,
+                salonId: salon.id, 
+                professionalId: selectedProfessionalId, 
+                clientName: newCustomerName,
+                clientPhone: clientPhone, 
+                serviceName: selectedService.name, 
+                startTime: selectedSlot.startTime,
+                endTime: selectedSlot.endTime, 
+                status: 'scheduled', 
+                price: selectedService.price,
                 paymentMethod: selectedPaymentMethod,
+                // Adicione quaisquer outros campos necessários
             };
             const newAppointment = await createAppointment(appointmentData);
             setConfirmedAppointment(newAppointment);
@@ -231,79 +321,16 @@ export default function SalonAppointmentPage() {
         }
     };
 
-    const handleSelectPaymentMethod = async (method: { id: string, name: string }) => {
-        setSelectedPaymentMethod(method.name);
-        setPixCode(null);
-        setPixCopiaECola('');
-
-        if (method.id === 'in_person') return;
-
-        if ((method.id === 'pix' || method.id === 'credit_card') && salon && selectedService) {
-            setIsLoadingPix(true);
-            try {
-                const paymentMethodToSend = method.id === 'pix' ? 'PIX' : 'CREDIT_CARD';
-                const functionUrl = `https://us-central1-hairflow-lmlxh.cloudfunctions.net/createAbacatePayBilling`;
-
-                // Montando o payload
-                const payload = {
-                    salonId: salon.id,
-                    serviceId: selectedService.id,
-                    customerInfo: { name: newCustomerName, email: newCustomerEmail, phone: clientPhone },
-                    paymentMethod: paymentMethodToSend,
-                };
-
-                // --- PASSO DE VERIFICAÇÃO 1 ---
-                // Verifique o console do seu navegador para ver este log.
-                console.log("Enviando para o Firebase:", payload);
-                // --- FIM DA VERIFICAÇÃO ---
-
-                const response = await fetch(functionUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-
-                if (!response.ok) {
-                    const errorMessage = await response.text();
-                    throw new Error(errorMessage || "Ocorreu um erro desconhecido no servidor.");
-                }
-
-                const result = await response.json();
-                const responseData = result.data;
-
-                if (paymentMethodToSend === 'CREDIT_CARD') {
-                    if (responseData?.payment_url) {
-                        window.location.href = responseData.payment_url;
-                    } else {
-                        throw new Error("URL de pagamento para cartão de crédito não recebida.");
-                    }
-                } else { // PIX
-                    if (responseData?.pix_qr_code) {
-                        setPixCode(responseData.pix_qr_code);
-                        setPixCopiaECola(responseData.pix_string);
-                    } else {
-                        throw new Error("Dados do PIX não recebidos.");
-                    }
-                }
-
-            } catch (error: any) {
-                console.error(`Erro ao processar pagamento com ${method.name}:`, error);
-                toast({ title: "Erro no Pagamento", description: error.message, variant: "destructive" });
-            } finally {
-                setIsLoadingPix(false);
-            }
-        }
-    };
-
     const handleCopyPixCode = () => {
-        if (!pixCode) return;
-        navigator.clipboard.writeText(pixCode).then(() => {
+        if (!pixCopiaECola) return;
+        navigator.clipboard.writeText(pixCopiaECola).then(() => {
             setCopied(true);
             toast({ title: "Copiado!", description: "Código Pix copiado para a área de transferência." });
             setTimeout(() => setCopied(false), 2000);
         });
     };
     
+    // RENDERIZAÇÃO
     if (isLoadingSalon) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-background"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>
@@ -316,6 +343,8 @@ export default function SalonAppointmentPage() {
         );
     }
 
+    // O restante do seu componente JSX permanece o mesmo.
+    // ... cole o seu return (...) aqui
     return (
         <div className="flex flex-col min-h-screen bg-background">
             <GlobalHeader />
@@ -418,7 +447,6 @@ export default function SalonAppointmentPage() {
                                                 <button
                                                     key={String(service.id)}
                                                     onClick={() => {
-                                                        console.log("Serviço selecionado no clique:", service); // Log para depuração
                                                         setSelectedServiceName(service.name);
                                                     }}
                                                     className={`w-full p-4 text-left transition-all border-2 rounded-xl ${selectedServiceName === service.name ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/30 dark:border-teal-600' : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'}`}
@@ -431,8 +459,8 @@ export default function SalonAppointmentPage() {
                                                         <p className="font-bold text-teal-600 dark:text-teal-400">R$ {service.price.toFixed(2)}</p>
                                                     </div>
                                                     {selectedServiceName === service.name && (
-                                                        <div className="mt-2">
-                                                            <div className="flex items-center justify-center ml-auto rounded-full w-6 h-6 bg-teal-500 dark:bg-teal-600">
+                                                        <div className="mt-2 flex justify-end">
+                                                            <div className="flex items-center justify-center rounded-full w-6 h-6 bg-teal-500 dark:bg-teal-600">
                                                                 <CheckCircle className="w-4 h-4 text-white" />
                                                             </div>
                                                         </div>
@@ -442,7 +470,7 @@ export default function SalonAppointmentPage() {
                                         </div>
                                     </div>
                                     
-                                    {/* INÍCIO DA ALTERAÇÃO: SELETOR DE PROFISSIONAL */}
+                                    {/* SELETOR DE PROFISSIONAL */}
                                     <div>
                                         <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Profissional</Label>
                                         <div className="relative mt-2">
@@ -474,7 +502,6 @@ export default function SalonAppointmentPage() {
                                             </div>
                                         </div>
                                     </div>
-                                    {/* FIM DA ALTERAÇÃO */}
                                 </div>
                             </CardContent>
                         </Card>
@@ -539,7 +566,7 @@ export default function SalonAppointmentPage() {
                                     </div>
                                 </div>
 
-                                {/* --- INÍCIO DA ALTERAÇÃO: Exibição do QR Code --- */}
+                                {/* Exibição do QR Code */}
                                 {selectedPaymentMethod === 'Pix' && (
                                     <div className="mt-6 text-center">
                                         {isLoadingPix && <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />}
@@ -560,7 +587,6 @@ export default function SalonAppointmentPage() {
                                         )}
                                     </div>
                                 )}
-                                {/* --- FIM DA ALTERAÇÃO --- */}
                             </CardContent>
                         </Card>
                         <div className="flex gap-3 pt-4">
