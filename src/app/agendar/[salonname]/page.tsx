@@ -13,6 +13,8 @@ import {
     createCustomer,
     generatePixForAppointment
 } from '@/lib/firestoreService';
+import { db } from '@/lib/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { useParams, useRouter } from 'next/navigation';
 import { GlobalHeader } from '@/components/shared/GlobalHeader';
 import { GlobalFooter } from '@/components/shared/GlobalFooter';
@@ -93,32 +95,49 @@ export default function SalonAppointmentPage() {
         [salonServices, selectedServiceName]
     );
 
+    // --- NOVO useEffect PARA BUSCAR SALÃO E SERVIÇOS ---
     useEffect(() => {
-        if (!salonSlug) return;
-        const fetchSalonAndData = async () => {
-            setIsLoadingSalon(true);
-            try {
-                const fetchedSalon = await getSalonBySlug(salonSlug);
-                if (!fetchedSalon) {
-                    toast({ title: "Salão Não Encontrado", variant: "destructive" });
-                    return;
+        const fetchSalonData = async () => {
+            if (params.salonname) {
+                const normalizedSlug = Array.isArray(params.salonname)
+                    ? params.salonname[0].toLowerCase()
+                    : params.salonname.toLowerCase();
+                const q = query(collection(db, "salons"), where("slug", "==", normalizedSlug));
+                try {
+                    const querySnapshot = await getDocs(q);
+                    if (!querySnapshot.empty) {
+                        const salonDoc = querySnapshot.docs[0];
+                        const salonData = salonDoc.data() as Omit<Salon, 'id'>;
+                        setSalon({ id: salonDoc.id, ...salonData });
+
+                        // --- INÍCIO DA CORREÇÃO ---
+                        // Busca a subcoleção de serviços
+                        const servicesCollectionRef = collection(db, "salons", salonDoc.id, "services");
+                        const servicesSnapshot = await getDocs(servicesCollectionRef);
+                        // Mapeia os documentos e ADICIONA O ID a cada objeto de serviço
+                        const servicesData: Service[] = servicesSnapshot.docs.map((doc) => {
+                            const data = doc.data();
+                            return {
+                                id: doc.id,
+                                name: data.name ?? '',
+                                price: data.price ?? 0,
+                                duration: data.duration ?? 0,
+                                ...data
+                            } as Service;
+                        });
+                        setSalonServices(servicesData);
+                        // --- FIM DA CORREÇÃO ---
+                    } else {
+                        console.log("Nenhum salão encontrado com este slug!");
+                        setSalon(null);
+                    }
+                } catch (error) {
+                    console.error("Erro ao buscar dados do salão:", error);
                 }
-                setSalon(fetchedSalon);
-                const [salonProfessionals, fetchedServices] = await Promise.all([
-                    getProfessionalsBySalon(fetchedSalon.id),
-                    getSalonServices(fetchedSalon.id)
-                ]);
-                setProfessionals(salonProfessionals);
-                setSalonServices(fetchedServices);
-            } catch (error) {
-                console.error("Failed to fetch salon data:", error);
-                toast({ title: "Erro ao carregar dados", description: "Não foi possível buscar as informações do salão.", variant: "destructive" });
-            } finally {
-                setIsLoadingSalon(false);
             }
         };
-        fetchSalonAndData();
-    }, [salonSlug, toast]);
+        fetchSalonData();
+    }, [params.salonname]);
 
     useEffect(() => {
         if (!selectedDate || !selectedProfessionalId || !selectedService) {
@@ -215,42 +234,61 @@ export default function SalonAppointmentPage() {
     const handleSelectPaymentMethod = async (method: { id: string, name: string }) => {
         setSelectedPaymentMethod(method.name);
         setPixCode(null);
-        setPixCopiaECola("");
+        setPixCopiaECola('');
 
-        if (method.id === 'in_person') {
-            setIsLoadingPix(false);
-            return;
-        }
+        if (method.id === 'in_person') return;
 
         if ((method.id === 'pix' || method.id === 'credit_card') && salon && selectedService) {
             setIsLoadingPix(true);
             try {
-                const customerInfo = { name: newCustomerName, email: newCustomerEmail, phone: clientPhone };
                 const paymentMethodToSend = method.id === 'pix' ? 'PIX' : 'CREDIT_CARD';
-                const result: any = await createAbacatePayBilling({
+                const functionUrl = `https://us-central1-hairflow-lmlxh.cloudfunctions.net/createAbacatePayBilling`;
+
+                // Montando o payload
+                const payload = {
                     salonId: salon.id,
                     serviceId: selectedService.id,
-                    customerInfo: customerInfo,
+                    customerInfo: { name: newCustomerName, email: newCustomerEmail, phone: clientPhone },
                     paymentMethod: paymentMethodToSend,
+                };
+
+                // --- PASSO DE VERIFICAÇÃO 1 ---
+                // Verifique o console do seu navegador para ver este log.
+                console.log("Enviando para o Firebase:", payload);
+                // --- FIM DA VERIFICAÇÃO ---
+
+                const response = await fetch(functionUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload),
                 });
 
+                if (!response.ok) {
+                    const errorMessage = await response.text();
+                    throw new Error(errorMessage || "Ocorreu um erro desconhecido no servidor.");
+                }
+
+                const result = await response.json();
+                const responseData = result.data;
+
                 if (paymentMethodToSend === 'CREDIT_CARD') {
-                    if (result.data && result.data.payment_url) {
-                        window.location.href = result.data.payment_url;
+                    if (responseData?.payment_url) {
+                        window.location.href = responseData.payment_url;
                     } else {
                         throw new Error("URL de pagamento para cartão de crédito não recebida.");
                     }
-                } else if (paymentMethodToSend === 'PIX') {
-                    if (result.data && result.data.pix_qr_code) {
-                        setPixCode(result.data.pix_qr_code);
-                        setPixCopiaECola(result.data.pix_string);
+                } else { // PIX
+                    if (responseData?.pix_qr_code) {
+                        setPixCode(responseData.pix_qr_code);
+                        setPixCopiaECola(responseData.pix_string);
                     } else {
                         throw new Error("Dados do PIX não recebidos.");
                     }
                 }
-            } catch (error) {
+
+            } catch (error: any) {
                 console.error(`Erro ao processar pagamento com ${method.name}:`, error);
-                toast({ title: "Erro no Pagamento", description: `Não foi possível iniciar o pagamento. Tente novamente.`, variant: "destructive" });
+                toast({ title: "Erro no Pagamento", description: error.message, variant: "destructive" });
             } finally {
                 setIsLoadingPix(false);
             }
@@ -376,7 +414,31 @@ export default function SalonAppointmentPage() {
                                     <div>
                                         <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Tipo de serviço</Label>
                                         <div className="mt-2 space-y-2">
-                                            {salonServices.map(service => (<button key={String(service.id)} onClick={() => setSelectedServiceName(service.name)} className={`w-full p-4 text-left transition-all border-2 rounded-xl ${selectedServiceName === service.name ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/30 dark:border-teal-600' : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'}`}><div className="flex items-center justify-between"><div><p className="font-medium text-gray-900 dark:text-white">{service.name}</p><p className="text-sm text-gray-600 dark:text-gray-400">Duração: {service.duration}min</p></div><p className="font-bold text-teal-600 dark:text-teal-400">R$ {service.price.toFixed(2)}</p></div>{selectedServiceName === service.name && (<div className="mt-2"><div className="flex items-center justify-center ml-auto rounded-full w-6 h-6 bg-teal-500 dark:bg-teal-600"><CheckCircle className="w-4 h-4 text-white" /></div></div>)}</button>))}
+                                            {salonServices.map(service => (
+                                                <button
+                                                    key={String(service.id)}
+                                                    onClick={() => {
+                                                        console.log("Serviço selecionado no clique:", service); // Log para depuração
+                                                        setSelectedServiceName(service.name);
+                                                    }}
+                                                    className={`w-full p-4 text-left transition-all border-2 rounded-xl ${selectedServiceName === service.name ? 'border-teal-500 bg-teal-50 dark:bg-teal-900/30 dark:border-teal-600' : 'border-gray-200 dark:border-gray-600 hover:border-gray-300 dark:hover:border-gray-500'}`}
+                                                >
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <p className="font-medium text-gray-900 dark:text-white">{service.name}</p>
+                                                            <p className="text-sm text-gray-600 dark:text-gray-400">Duração: {service.duration}min</p>
+                                                        </div>
+                                                        <p className="font-bold text-teal-600 dark:text-teal-400">R$ {service.price.toFixed(2)}</p>
+                                                    </div>
+                                                    {selectedServiceName === service.name && (
+                                                        <div className="mt-2">
+                                                            <div className="flex items-center justify-center ml-auto rounded-full w-6 h-6 bg-teal-500 dark:bg-teal-600">
+                                                                <CheckCircle className="w-4 h-4 text-white" />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </button>
+                                            ))}
                                         </div>
                                     </div>
                                     
