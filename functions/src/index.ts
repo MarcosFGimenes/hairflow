@@ -1,7 +1,7 @@
 import * as functions from "firebase-functions";
 import * as admin from "firebase-admin";
+import axios from "axios";
 import cors from "cors";
-import axios from "axios"; // Usaremos axios para a requisição HTTP
 
 // --- INÍCIO DA SOLUÇÃO DEFINITIVA ---
 
@@ -90,7 +90,7 @@ const generateManualPix = (
 
 // --- FIM DA SOLUÇÃO DEFINITIVA ---
 
-const corsHandler = cors({origin: true});
+// const corsHandler = cors({origin: true}); // Removido para evitar redeclaração
 
 admin.initializeApp();
 
@@ -141,82 +141,120 @@ export const generatePix = functions.https.onRequest((request, response) => {
   });
 });
 
-// --- INÍCIO DA CORREÇÃO ---
 
-// 1. Defina interfaces para dar "forma" aos seus dados. Isso resolve os erros do TypeScript.
-interface CustomerInfo {
-    name: string;
-    email: string;
-    phone: string;
-}
-
-interface CreateBillingData {
-    salonId: string;
-    serviceId: string;
-    customerInfo: CustomerInfo;
-    paymentMethod: "PIX" | "CREDIT_CARD";
-}
+// (Removido: interface CreateBillingData não utilizada)
 
 // --- FIM DA CORREÇÃO ---
 
+// Garante que o corsHandler seja inicializado
+const corsHandler = cors({ origin: true });
+
+// Inicializa o app do Firebase apenas uma vez
+if (admin.apps.length === 0) {
+  admin.initializeApp();
+}
+
+
+
+// Substitua TODA a sua função createAbacatePayBilling por esta versão corrigida.
+
 export const createAbacatePayBilling = functions.https.onRequest((request, response) => {
-    corsHandler(request, response, async () => {
-        // ADICIONADO: Log para depuração. Veremos isso nos logs do Firebase.
-        functions.logger.info("Request recebido:", {
-            method: request.method,
-            body: request.body,
-        });
+  corsHandler(request, response, async () => {
+      // Valida o método da requisição
+      if (request.method !== "POST") {
+          functions.logger.warn("Método não permitido recebido:", request.method);
+          return response.status(405).send({ error: "Método não permitido." });
+      }
 
-        if (request.method !== "POST") {
-            return response.status(405).send("Método não permitido. Use POST.");
-        }
+      try {
+          // O frontend enviará um payload mais simples e seguro
+          const { salonId, serviceId, customer, paymentMethod } = request.body;
+          functions.logger.info("Request Body Recebido:", request.body);
 
-        try {
-            // Agora pegamos o corpo da requisição diretamente.
-            const data = request.body as CreateBillingData;
-            const { salonId, serviceId, customerInfo, paymentMethod } = data;
+          // Validação de dados essenciais
+          if (!salonId || !serviceId || !customer?.name || !customer.email || !customer.phone || !customer.taxId || !paymentMethod) {
+              functions.logger.error("Erro de validação: Dados da cobrança incompletos.", request.body);
+              return response.status(400).send({ error: "Dados da cobrança incompletos. Verifique salão, serviço, cliente, CPF/CNPJ e método de pagamento." });
+          }
 
-            if (!salonId || !serviceId || !customerInfo || !paymentMethod) {
-                // ALTERADO: Enviando erro como texto simples
-                return response.status(400).send("Dados da cobrança incompletos. Verifique o payload enviado.");
-            }
+          // Busca dados do salão e do serviço em paralelo para otimizar
+          const [salonDoc, serviceDoc] = await Promise.all([
+              admin.firestore().collection("salons").doc(salonId).get(),
+              admin.firestore().collection("salons").doc(salonId).collection("services").doc(serviceId).get()
+          ]);
 
-            const salonDoc = await admin.firestore().collection("salons").doc(salonId).get();
-            const salonData = salonDoc.data();
-            if (!salonDoc.exists || !salonData?.abacatepayApiKey) {
-                return response.status(404).send("A chave da API AbacatePay não está configurada para este salão.");
-            }
-
-            const serviceDoc = await admin.firestore().collection("salons").doc(salonId).collection("services").doc(serviceId).get();
-            const serviceData = serviceDoc.data();
-            if (!serviceDoc.exists || !serviceData?.price || !serviceData?.name) {
-                return response.status(404).send("O serviço selecionado não foi encontrado ou está com dados incompletos.");
-            }
-
-            const apiKey = salonData.abacatepayApiKey;
-            const payload = {
-                amount: serviceData.price * 100,
-                description: `Agendamento: ${serviceData.name}`,
-                customer: customerInfo,
-                methods: [paymentMethod],
-                returnUrl: paymentMethod === 'CREDIT_CARD' ? `https://seusite.com/agendar/${salonData.slug}?status=success` : undefined,
-            };
-
-            const abacatePayResponse = await axios.post("https://api.abacatepay.com/v1/billing/create", payload, {
-                headers: {
-                    "Authorization": `Bearer ${apiKey}`,
-                    "Content-Type": "application/json"
+          const salonData = salonDoc.data();
+          if (!salonDoc.exists || !salonData?.abacatepayApiKey || !salonData?.slug) {
+              functions.logger.error(`Configurações inválidas para o salão: ${salonId}`);
+              return response.status(404).send({ error: "A chave da API AbacatePay não está configurada ou o salão não foi encontrado." });
+          }
+          
+          const serviceData = serviceDoc.data();
+          if (!serviceDoc.exists || !serviceData?.price || !serviceData?.name) {
+              functions.logger.error(`Serviço não encontrado: ${serviceId} no salão ${salonId}`);
+              return response.status(404).send({ error: "O serviço selecionado não foi encontrado." });
+          }
+          
+          // --- CORREÇÃO PRINCIPAL: PAYLOAD CONFORME A DOCUMENTAÇÃO DA ABACATEPAY ---
+          const abacatePayPayload = {
+              frequency: "ONE_TIME",
+              methods: [paymentMethod], // Ex: ["PIX"] ou ["CREDIT_CARD"]
+              products: [
+                {
+                  externalId: `svc-${serviceId}-${Date.now()}`,
+                  name: serviceData.name,
+                  description: `Agendamento para o serviço: ${serviceData.name}`,
+                  quantity: 1,
+                  price: serviceData.price * 100, // PREÇO EM CENTAVOS!
                 }
-            });
+              ],
+              // ATENÇÃO: Use o seu domínio real aqui
+              returnUrl: `https://hairflow-lmlxh.web.app/agendar/${salonData.slug}?status=cancelled`,
+              completionUrl: `https://hairflow-lmlxh.web.app/agendar/${salonData.slug}?status=success`,
+              customer: {
+                name: customer.name,
+                email: customer.email,
+                cellphone: customer.phone.replace(/\D/g, ''),
+                taxId: customer.taxId.replace(/\D/g, '') // <-- ADICIONADO E LIMPO
+              },
+              allowCoupons: false,
+              coupons: []
+          };
 
-            return response.status(200).send({ data: abacatePayResponse.data });
+          functions.logger.info("Enviando Payload para AbacatePay:", JSON.stringify(abacatePayPayload, null, 2));
 
-        } catch (error: any) {
-            functions.logger.error("Erro CRÍTICO ao criar cobrança AbacatePay:", error);
-            if (axios.isAxiosError(error) && error.response) {
-                return response.status(error.response.status).send(`Erro da API AbacatePay: ${error.response.statusText}`);
+          const abacatePayResponse = await axios.post(
+            "https://api.abacatepay.com/v1/billing/create", // <--- CORRIGIDO
+            abacatePayPayload,
+            { 
+                headers: { 
+                    "Authorization": `Bearer ${salonData.abacatepayApiKey}`,
+                    "Content-Type": "application/json"
+                } 
             }
-            return response.status(500).send("Erro interno ao processar a cobrança.");
-        }
-    });
+        );
+
+          // --- CORREÇÃO NA RESPOSTA: Retorna a resposta da API DIRETAMENTE ---
+          // Não envolva em um objeto { data: ... }
+          functions.logger.info("Resposta da AbacatePay recebida com sucesso.");
+          return response.status(200).send(abacatePayResponse.data);
+
+      } catch (error: any) {
+          functions.logger.error("ERRO CRÍTICO AO CHAMAR ABACATEPAY:", {
+              message: error.message,
+              status: error.response?.status,
+              responseData: error.response?.data 
+          });
+
+          if (axios.isAxiosError(error) && error.response) {
+              // Envia os detalhes do erro da AbacatePay para o frontend
+              return response.status(error.response.status).send({ 
+                  error: `Erro da API AbacatePay: ${error.response.data?.message || error.response.statusText}`,
+                  details: error.response.data 
+              });
+          }
+          
+          return response.status(500).send({ error: "Erro interno no servidor ao processar pagamento." });
+      }
+  });
 });

@@ -49,6 +49,7 @@ export interface Professional {
 }
 
 export interface TimeSlot {
+  isBooked: boolean | undefined;
   startTime: string; // ISO string
   endTime: string; // ISO string
 }

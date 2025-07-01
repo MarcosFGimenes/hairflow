@@ -16,7 +16,7 @@ import {
   serverTimestamp,
 } from 'firebase/firestore';
 import type { Salon, Professional, Appointment, TimeSlot, Service, Customer, WorkDay } from './types';
-import { addMinutes, formatISO, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
+import { addMinutes, format, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'date-fns';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 
 // Function to create a URL-friendly slug
@@ -265,73 +265,106 @@ export const getAppointmentsForDay = async (professionalId: string, date: Date):
     return {
       id: doc.id,
       ...data,
+      // Garante que a conversão para string ISO seja consistente
       startTime: (data.startTime as Timestamp).toDate().toISOString(),
       endTime: (data.endTime as Timestamp).toDate().toISOString(),
     } as Appointment;
   });
 };
 
+/**
+ * =================================================================
+ * FUNÇÃO CORRIGIDA
+ * =================================================================
+ * Esta função foi reescrita para corrigir bugs na obtenção do dia da semana e na lógica de geração de slots.
+ */
 export const getAvailableSlotsForProfessional = async (
   professionalId: string,
   date: Date,
   serviceDuration: number
 ): Promise<TimeSlot[]> => {
+  // Validações iniciais
   if (!professionalId || !date || !serviceDuration) {
-    throw new Error('Professional ID, date, and service duration are required');
+    console.error('Dados insuficientes para buscar horários:', { professionalId, date, serviceDuration });
+    return [];
   }
 
-  const professionalDocRef = doc(db, 'professionals', professionalId);
-  const professionalSnap = await getDoc(professionalDocRef);
-
+  // Busca os dados do profissional
+  const professionalSnap = await getDoc(doc(db, 'professionals', professionalId));
   if (!professionalSnap.exists()) {
-    throw new Error('Professional not found');
+    console.error('Profissional não encontrado com ID:', professionalId);
+    return [];
   }
 
   const professionalData = professionalSnap.data() as Professional;
-  const workHours = professionalData.workHours as { [key: string]: WorkDay } | undefined;
+  const workHours = professionalData.workHours;
 
   if (!workHours) {
-    console.warn('No work hours defined for professional');
+    console.warn('Horários de trabalho (workHours) não definidos para o profissional:', professionalId);
     return [];
   }
 
-  const dayOfWeekStr = date.toLocaleString('en-US', { weekday: 'long' }).toLowerCase();
+  // --- CORREÇÃO PRINCIPAL ---
+  // Obtém o dia da semana de forma confiável usando date-fns (ex: "monday", "tuesday")
+  const dayOfWeekStr = format(date, 'EEEE').toLowerCase();
+  console.log(`[DEBUG] Data selecionada: ${date}, Dia da semana calculado: ${dayOfWeekStr}`);
+
   const todayWorkHours = workHours[dayOfWeekStr];
 
+  // Verifica se o profissional trabalha no dia selecionado
   if (!todayWorkHours || !todayWorkHours.isWorkDay) {
+    console.log(`[DEBUG] O profissional não trabalha neste dia (${dayOfWeekStr}).`);
     return [];
   }
 
+  console.log('[DEBUG] Horários de trabalho para o dia:', todayWorkHours);
+
+  // Busca agendamentos já existentes para o dia
   const appointments = await getAppointmentsForDay(professionalId, date);
+  console.log('[DEBUG] Agendamentos encontrados para o dia:', appointments);
+
   const availableSlots: TimeSlot[] = [];
-  const dateStr = formatISO(date, { representation: 'date' });
+  const dateStr = format(date, 'yyyy-MM-dd');
+
+  // Define a hora de início e fim do expediente
   const startTime = parseISO(`${dateStr}T${todayWorkHours.startTime}`);
   const endTime = parseISO(`${dateStr}T${todayWorkHours.endTime}`);
 
+  // Verifica se as datas de início e fim são válidas
   if (isNaN(startTime.getTime()) || isNaN(endTime.getTime())) {
-    throw new Error('Invalid work hours format');
+    console.error('Formato de hora inválido no perfil do profissional:', todayWorkHours);
+    return [];
   }
 
   let currentTime = startTime;
 
+  // Itera sobre o expediente em incrementos de 15 minutos (ou outro valor de sua preferência)
   while (addMinutes(currentTime, serviceDuration) <= endTime) {
     const slotEnd = addMinutes(currentTime, serviceDuration);
+
+    // Verifica se o slot atual sobrepõe algum agendamento existente
     const isBooked = appointments.some((app) => {
       const appStart = parseISO(app.startTime);
       const appEnd = parseISO(app.endTime);
+      // Condição de sobreposição: (InícioSlot < FimAgendamento) E (FimSlot > InícioAgendamento)
       return currentTime < appEnd && slotEnd > appStart;
     });
 
+    // Se o slot não estiver ocupado, adiciona à lista de disponíveis
     if (!isBooked) {
       availableSlots.push({
         startTime: currentTime.toISOString(),
         endTime: slotEnd.toISOString(),
+        isBooked: undefined
       });
     }
 
-    currentTime = addMinutes(currentTime, 15); // 15-minute increments for flexibility
+    // Avança para o próximo possível horário de início
+    // Use um incremento menor (como 15 min) para ter mais flexibilidade nos horários de início
+    currentTime = addMinutes(currentTime, 15);
   }
 
+  console.log('[DEBUG] Horários disponíveis calculados:', availableSlots);
   return availableSlots;
 };
 

@@ -60,6 +60,7 @@ export default function SalonAppointmentPage() {
     const [customer, setCustomer] = useState<Customer | null>(null);
     const [newCustomerName, setNewCustomerName] = useState('');
     const [newCustomerEmail, setNewCustomerEmail] = useState('');
+    const [newCustomerTaxId, setNewCustomerTaxId] = useState('');
 
     const [professionals, setProfessionals] = useState<Professional[]>([]);
     const [salonServices, setSalonServices] = useState<Service[]>([]);
@@ -78,6 +79,9 @@ export default function SalonAppointmentPage() {
     const [isLoadingPix, setIsLoadingPix] = useState(false);
     const [copied, setCopied] = useState(false);
 
+    // Adicione o estado para a chave da API do AbacatePay
+    const [abacatepayApiKey, setAbacatepayApiKey] = useState<string>('');
+
     const currentProfessional = useMemo(() => 
         professionals.find(p => p.id === selectedProfessionalId), 
         [professionals, selectedProfessionalId]
@@ -88,7 +92,7 @@ export default function SalonAppointmentPage() {
         [salonServices, selectedServiceName]
     );
 
-    // --- EFEITO 1: BUSCAR DADOS DO SALÃO E SERVIÇOS ---
+    // --- EFEITO 1: BUSCAR DADOS DO SALÃO, SERVIÇOS E SETTINGS ---
     useEffect(() => {
         const fetchSalonData = async () => {
             setIsLoadingSalon(true);
@@ -113,6 +117,16 @@ export default function SalonAppointmentPage() {
                             ...doc.data()
                         } as Service));
                         setSalonServices(servicesData);
+
+                        // Busca settings do salão (incluindo abacatepayApiKey)
+                        const settingsCollectionRef = collection(db, "salons", salonDoc.id, "settings");
+                        const settingsSnapshot = await getDocs(settingsCollectionRef);
+                        let abacatepayApiKey = '';
+                        settingsSnapshot.forEach(doc => {
+                          const data = doc.data();
+                          if (data.abacatepayApiKey) abacatepayApiKey = data.abacatepayApiKey;
+                        });
+                        setAbacatepayApiKey(abacatepayApiKey);
                     } else {
                         console.log("Nenhum salão encontrado com este slug!");
                         setSalon(null);
@@ -152,15 +166,20 @@ export default function SalonAppointmentPage() {
 
     // --- EFEITO 3: BUSCAR HORÁRIOS DISPONÍVEIS ---
     useEffect(() => {
-        if (!selectedDate || !selectedProfessionalId || !selectedService) {
+        // Adiciona uma verificação para garantir que selectedDate é um objeto Date válido
+        if (!selectedDate || !selectedProfessionalId || !selectedService || !(selectedDate instanceof Date)) {
             setAvailableSlots([]);
             return;
         }
+
         const fetchSlots = async () => {
             setIsLoadingSlots(true);
             setSelectedSlot(null);
             try {
-                const slots = await getAvailableSlotsForProfessional(selectedProfessionalId, new Date(selectedDate), selectedService.duration);
+                // --- CORREÇÃO AQUI ---
+                // Passa o objeto 'selectedDate' diretamente, pois já garantimos que é um Date.
+                // A lógica de `new Date(selectedDate)` foi removida pois era redundante e podia causar bugs.
+                const slots = await getAvailableSlotsForProfessional(selectedProfessionalId, selectedDate, selectedService.duration);
                 setAvailableSlots(slots);
             } catch (error) {
                 console.error("Error fetching slots:", error);
@@ -208,73 +227,85 @@ export default function SalonAppointmentPage() {
         setCurrentStep(bookingSteps.PAYMENT);
     };
 
-     const handleSelectPaymentMethod = async (method: { id: string, name: string }) => {
-        setSelectedPaymentMethod(method.name);
-        setPixCode(null);
-        setPixCopiaECola('');
+    // Encontre a função handleSelectPaymentMethod e substitua-a por esta versão.
 
-        if (method.id === 'in_person') {
-            return;
+const handleSelectPaymentMethod = async (method: { id: string; name: string }) => {
+    setSelectedPaymentMethod(method.name);
+
+    if (method.id === 'in_person') {
+        // Para pagamento no salão, o fluxo continua o mesmo, sem redirecionamento.
+        return;
+    }
+
+    // Validações para garantir que todos os dados do agendamento estão prontos
+    if (!salon || !selectedService || !newCustomerName || !clientPhone || !newCustomerEmail || !currentProfessional || !selectedSlot) {
+        toast({
+            title: "Dados Incompletos",
+            description: "Por favor, preencha todos os seus dados e selecione um horário antes de prosseguir.",
+            variant: "destructive",
+        });
+        return;
+    }
+
+    setIsLoadingPix(true); // Reutilizamos o estado de loading
+
+    try {
+        const paymentMethodToSend = method.id === 'pix' ? 'PIX' : 'CREDIT_CARD';
+        const functionUrl = `https://us-central1-hairflow-lmlxh.cloudfunctions.net/createAbacatePayBilling`;
+
+        const payload = {
+            salonId: salon.id,
+            serviceId: selectedService.id,
+            paymentMethod: paymentMethodToSend,
+            customer: {
+                name: newCustomerName,
+                email: newCustomerEmail,
+                phone: clientPhone,
+                taxId: newCustomerTaxId || "00000000000", // Inclua o taxId coletado ou um placeholder
+            },
+        };
+
+        const response = await fetch(functionUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+
+        const result = await response.json();
+
+        // Corrigido: pega a URL correta da resposta da API
+        const billingUrl = result.data?.url;
+        if (billingUrl) {
+            // Salva os detalhes do agendamento no localStorage antes de redirecionar
+            const pendingBooking = {
+                salonId: salon.id,
+                professionalId: selectedProfessionalId,
+                currentProfessionalName: currentProfessional.name,
+                clientName: newCustomerName,
+                clientPhone: clientPhone,
+                serviceName: selectedService.name,
+                startTime: selectedSlot.startTime,
+                endTime: selectedSlot.endTime,
+                price: selectedService.price,
+                paymentMethod: method.name,
+            };
+            localStorage.setItem('pendingBooking', JSON.stringify(pendingBooking));
+
+            // Redireciona o cliente para a página de pagamento da AbacatePay
+            window.location.href = billingUrl;
+        } else {
+            throw new Error("URL de pagamento não recebida da API.");
         }
-        
-        if (!salon || !selectedService || !newCustomerName) {
-            toast({ title: "Erro", description: "Dados do agendamento incompletos para gerar pagamento.", variant: "destructive"});
-            return;
-        }
 
-        if (method.id === 'pix' || method.id === 'credit_card') {
-            setIsLoadingPix(true);
-            try {
-                const paymentMethodToSend = method.id === 'pix' ? 'PIX' : 'CREDIT_CARD';
-                
-                const functionUrl = `https://us-central1-hairflow-lmlxh.cloudfunctions.net/createAbacatePayBilling`;
-
-                const payload = {
-                    salonId: salon.id,
-                    serviceId: selectedService.id, // ID do serviço agora está garantido
-                    customerInfo: { name: newCustomerName, email: newCustomerEmail, phone: clientPhone },
-                    paymentMethod: paymentMethodToSend,
-                };
-                
-                console.log("Enviando para o Firebase Functions:", payload);
-
-                const response = await fetch(functionUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload),
-                });
-
-                if (!response.ok) {
-                    const errorBody = await response.text();
-                    console.error("Erro da API de pagamento:", errorBody);
-                    throw new Error(errorBody || "Falha ao se comunicar com o serviço de pagamento.");
-                }
-
-                const result = await response.json();
-                const responseData = result.data;
-
-                if (paymentMethodToSend === 'CREDIT_CARD') {
-                    if (responseData?.payment_url) {
-                        window.location.href = responseData.payment_url;
-                    } else {
-                        throw new Error("URL de pagamento para cartão de crédito não recebida.");
-                    }
-                } else { // PIX
-                    if (responseData?.pix_qr_code && responseData?.pix_string) {
-                        setPixCode(responseData.pix_qr_code);
-                        setPixCopiaECola(responseData.pix_string);
-                    } else {
-                        throw new Error("Dados do PIX não recebidos.");
-                    }
-                }
-            } catch (error: any) {
-                console.error(`Erro ao processar pagamento com ${method.name}:`, error);
-                toast({ title: "Erro no Pagamento", description: error.message, variant: "destructive" });
-            } finally {
-                setIsLoadingPix(false);
-            }
-        }
-    };
+    } catch (error: any) {
+        toast({
+            title: "Erro no Pagamento",
+            description: error.message,
+            variant: "destructive",
+        });
+        setIsLoadingPix(false);
+    }
+};
 
     const handleSubmitBooking = async () => {
         if (!salon || !selectedProfessionalId || !selectedSlot || !selectedService || !currentProfessional || !newCustomerName || !selectedPaymentMethod) {
@@ -330,6 +361,79 @@ export default function SalonAppointmentPage() {
         });
     };
     
+    // --- HANDLE PAYMENT STATUS FROM URL ---
+    useEffect(() => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const status = urlParams.get('status');
+      if (status === 'success') {
+        toast({ title: "Pagamento Confirmado", description: "Seu pagamento foi processado com sucesso." });
+        setCurrentStep(bookingSteps.CONFIRMATION);
+      } else if (status === 'cancelled') {
+        toast({ title: "Pagamento Cancelado", description: "O pagamento foi cancelado. Tente novamente.", variant: "destructive" });
+      }
+      // Optionally, you may want to clean the query string after handling
+    }, []);
+
+    // --- EFEITO: TRATAR STATUS DE PAGAMENTO VIA QUERY STRING ---
+    useEffect(() => {
+        const handlePaymentSuccess = async () => {
+            const pendingBookingString = localStorage.getItem('pendingBooking');
+            if (!pendingBookingString) return;
+
+            // Limpa o item do localStorage para não ser usado novamente
+            localStorage.removeItem('pendingBooking'); 
+
+            const pendingBooking = JSON.parse(pendingBookingString);
+            // Simula o loading de confirmação
+            setIsConfirming(true); 
+
+            try {
+                // Recria os objetos necessários para a tela de confirmação
+                setConfirmedAppointment({
+                    id: '', // O ID real virá da função de criação
+                    ...pendingBooking
+                });
+                // O nome do profissional já está no objeto salvo
+                setCurrentStep(bookingSteps.CONFIRMATION);
+                // Cria o agendamento no Firestore
+                await createAppointment(pendingBooking);
+                toast({
+                    title: "Pagamento Confirmado e Agendamento Realizado!",
+                    description: "Seu agendamento foi confirmado com sucesso.",
+                });
+            } catch (error) {
+                console.error("Erro ao criar agendamento após pagamento:", error);
+                toast({
+                    title: "Erro na Confirmação",
+                    description: "Seu pagamento foi aprovado, mas houve um erro ao confirmar o agendamento. Entre em contato com o salão.",
+                    variant: "destructive",
+                });
+            } finally {
+                setIsConfirming(false);
+            }
+        };
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const status = urlParams.get('status');
+
+        if (status === 'success') {
+            handlePaymentSuccess();
+        } else if (status === 'cancelled') {
+            toast({
+                title: "Pagamento Cancelado",
+                description: "A operação de pagamento foi cancelada.",
+                variant: "destructive",
+            });
+        }
+
+        // Limpa os parâmetros da URL para evitar reprocessamento
+        if (status) {
+            const url = new URL(window.location.href);
+            url.searchParams.delete('status');
+            window.history.replaceState({}, document.title, url.pathname + url.search);
+        }
+    }, []); // Executa apenas uma vez quando o componente carrega
+
     // RENDERIZAÇÃO
     if (isLoadingSalon) {
         return (
@@ -425,7 +529,31 @@ export default function SalonAppointmentPage() {
                                 </div>
                                 <div className="space-y-4">
                                     <div><Label htmlFor="name" className="text-sm font-medium text-gray-700 dark:text-gray-300">Nome completo</Label><Input id="name" type="text" placeholder="Digite seu nome" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} className="mt-1 border-gray-200 dark:border-gray-600 focus:border-teal-500 focus:ring-teal-500 dark:bg-gray-700 dark:text-white" required /></div>
-                                    <div><Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">E-mail (opcional)</Label><Input id="email" type="email" placeholder="seu@email.com" value={newCustomerEmail} onChange={(e) => setNewCustomerEmail(e.target.value)} className="mt-1 border-gray-200 dark:border-gray-600 focus:border-teal-500 focus:ring-teal-500 dark:bg-gray-700 dark:text-white" /></div>
+                                    <div>
+                                      <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">E-mail</Label>
+                                      <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="seu@email.com"
+                                        value={newCustomerEmail}
+                                        onChange={(e) => setNewCustomerEmail(e.target.value)}
+                                        className="mt-1 border-gray-200 dark:border-gray-600 focus:border-teal-500 focus:ring-teal-500 dark:bg-gray-700 dark:text-white"
+                                        required
+                                      />
+                                    </div>
+                                    {/* --- NOVO CAMPO ADICIONADO --- */}
+                                    <div>
+                                        <Label htmlFor="taxId" className="text-sm font-medium text-gray-700 dark:text-gray-300">CPF ou CNPJ</Label>
+                                        <Input 
+                                            id="taxId" 
+                                            type="text" 
+                                            placeholder="000.000.000-00" 
+                                            value={newCustomerTaxId} 
+                                            onChange={(e) => setNewCustomerTaxId(e.target.value)} 
+                                            className="mt-1 border-gray-200 dark:border-gray-600 focus:border-teal-500 focus:ring-teal-500 dark:bg-gray-700 dark:text-white"
+                                            required 
+                                        />
+                                    </div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -555,45 +683,25 @@ export default function SalonAppointmentPage() {
                                                 onClick={() => handleSelectPaymentMethod(option)}
                                                 className={`w-full flex items-center p-4 text-left transition-all border-2 rounded-xl 
                                                     ${selectedPaymentMethod === option.name ? 'border-primary bg-primary/10' : 'border-border hover:border-primary/50'}`}
+                                                disabled={isLoadingPix}
                                             >
-                                                {option.icon}
+                                                {isLoadingPix && option.id !== 'in_person' ? <Loader2 className="w-5 h-5 mr-2 animate-spin" /> : option.icon}
                                                 <span className="font-medium">{option.name}</span>
-                                                {selectedPaymentMethod === option.name && (
-                                                    <CheckCircle className="w-5 h-5 ml-auto text-primary" />
-                                                )}
                                             </button>
                                         ))}
                                     </div>
                                 </div>
-
-                                {/* Exibição do QR Code */}
-                                {selectedPaymentMethod === 'Pix' && (
-                                    <div className="mt-6 text-center">
-                                        {isLoadingPix && <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />}
-                                        
-                                        {pixCode && !isLoadingPix && (
-                                            <Card className="p-4 bg-white">
-                                                <QRCode
-                                                    value={pixCode}
-                                                    size={256}
-                                                    style={{ height: "auto", maxWidth: "100%", width: "100%" }}
-                                                    viewBox={`0 0 256 256`}
-                                                />
-                                                <Button onClick={handleCopyPixCode} className="w-full mt-4">
-                                                    {copied ? <CheckCircle className="mr-2"/> : <Copy className="mr-2"/>}
-                                                    {copied ? 'Copiado!' : 'Copiar Código Pix'}
-                                                </Button>
-                                            </Card>
-                                        )}
-                                    </div>
-                                )}
-                            </CardContent>
+                        </CardContent>
                         </Card>
+                        {/* Botões de Ação */}
                         <div className="flex gap-3 pt-4">
                             <Button variant="outline" onClick={() => setCurrentStep(bookingSteps.SCHEDULING)} className="flex-1 h-12">Voltar</Button>
-                            <Button onClick={handleSubmitBooking} disabled={!selectedPaymentMethod || isConfirming} className="flex-1 h-12">
-                                {isConfirming ? <Loader2 className="animate-spin" /> : 'Confirmar Agendamento'}
-                            </Button>
+                            {/* O botão de confirmar só é útil para pagamento presencial agora */}
+                            {selectedPaymentMethod === 'Pagar no Salão' && (
+                                <Button onClick={handleSubmitBooking} disabled={isConfirming} className="flex-1 h-12">
+                                    {isConfirming ? <Loader2 className="animate-spin" /> : 'Confirmar Agendamento'}
+                                </Button>
+                            )}
                         </div>
                     </div>
                 )}
